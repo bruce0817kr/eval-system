@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { usePathname } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import {
   Building2,
   ClipboardList,
@@ -76,6 +76,7 @@ export default function AdminLayout({
   children: React.ReactNode
 }) {
   const pathname = usePathname()
+  const router = useRouter()
   const currentItem =
     adminNavItems.find(
       (item) => pathname === item.href || pathname.startsWith(`${item.href}/`)
@@ -141,6 +142,17 @@ export default function AdminLayout({
             type="button"
             variant="outline"
             className="w-full justify-start group-data-[collapsible=icon]:size-8 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0"
+            onClick={async () => {
+              try {
+                await fetch("/api/auth/logout", {
+                  method: "POST",
+                  credentials: "include",
+                })
+              } finally {
+                router.push("/admin/login")
+                router.refresh()
+              }
+            }}
           >
             <LogOut />
             <span className="group-data-[collapsible=icon]:hidden">로그아웃</span>

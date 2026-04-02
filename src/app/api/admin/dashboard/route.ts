@@ -1,12 +1,12 @@
 import { NextResponse } from 'next/server'
+import type { NextRequest } from 'next/server'
 import { prisma } from '@/lib/db'
-import { getAdminSession } from '@/lib/auth/jwt'
 
-export async function GET(request: Request) {
+export async function GET(request: NextRequest) {
   try {
-    const admin = await getAdminSession(request)
+    const token = request.cookies.get('admin_session')?.value
     
-    if (!admin) {
+    if (!token) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
