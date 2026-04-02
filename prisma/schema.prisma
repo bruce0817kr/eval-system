@@ -1,0 +1,445 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─── Enums ───
+
+enum AdminRole {
+  admin
+  operator
+  auditor
+}
+
+enum SessionStatus {
+  draft
+  open
+  in_progress
+  closed
+  finalized
+}
+
+enum ApplicationStatus {
+  registered
+  evaluating
+  completed
+  excluded
+}
+
+enum SubmissionState {
+  draft
+  submitted
+  signed
+  invalidated
+}
+
+enum DocType {
+  business_plan
+  supplementary
+}
+
+enum ActorType {
+  admin
+  committee_member
+  system
+}
+
+enum AuditAction {
+  login
+  logout
+  view
+  create
+  update
+  delete
+  submit
+  sign
+  reopen
+  finalize
+  import
+  export
+  download
+  aggregate
+}
+
+// ─── Admin ───
+
+model AdminUser {
+  id           String     @id @default(cuid())
+  email        String     @unique
+  passwordHash String
+  name         String
+  role         AdminRole  @default(operator)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  evaluationSessions EvaluationSession[] @relation("SessionCreator")
+  importBatches      ImportBatch[]
+  aggregationRuns    AggregationRun[]    @relation("AggregationComputer")
+  computedSnapshots  ResultSnapshot[]    @relation("SnapshotComputer")
+
+  @@map("admin_user")
+}
+
+// ─── Committee Member ───
+
+model CommitteeMember {
+  id          String   @id @default(cuid())
+  name        String
+  phone       String
+  organization String?
+  position    String?
+  field       String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  assignments       SessionCommitteeAssignment[]
+  evaluationDrafts  EvaluationDraft[]
+  evaluationSubmissions EvaluationSubmission[]
+
+  @@map("committee_member")
+}
+
+// ─── Evaluation Session ───
+
+model EvaluationSession {
+  id             String        @id @default(cuid())
+  title          String
+  description    String?
+  status         SessionStatus @default(draft)
+  committeeSize  Int           @default(5)
+  trimRule       String        @default("exclude_min_max")
+  createdAt      DateTime      @default(now())
+  openedAt       DateTime?
+  closedAt       DateTime?
+  finalizedAt    DateTime?
+
+  createdById String?
+  createdBy   AdminUser? @relation("SessionCreator", fields: [createdById], references: [id])
+
+  formDefinition     SessionFormDefinition?
+  applications       Application[]
+  committeeMembers   SessionCommitteeAssignment[]
+  resultSnapshots    ResultSnapshot[]
+  importBatches      ImportBatch[]
+  aggregationRuns    AggregationRun[]
+  auditEvents        AuditEvent[]
+
+  @@map("evaluation_session")
+}
+
+// ─── Session Form Definition (Snapshot) ───
+
+model SessionFormDefinition {
+  id                      String   @id @default(cuid())
+  schemaJson              Json
+  totalScore              Float
+  itemsCount              Int
+  snapshotAt              DateTime @default(now())
+  createdAt               DateTime @default(now())
+
+  sessionId               String   @unique
+  session                 EvaluationSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  formTemplateVersionId   String?
+  submissions             EvaluationSubmission[]
+
+  @@map("session_form_definition")
+}
+
+// ─── Company ───
+
+model Company {
+  id            String   @id @default(cuid())
+  name          String
+  ceoName       String?
+  businessNumber String?
+  address       String?
+  phone         String?
+  email         String?
+  industry      String?
+  foundedDate   DateTime?
+  createdAt     DateTime @default(now())
+
+  applications Application[]
+
+  @@map("company")
+}
+
+// ─── Application ───
+
+model Application {
+  id              String            @id @default(cuid())
+  evaluationOrder Int               @default(0)
+  status          ApplicationStatus @default(registered)
+  notes           String?
+  createdAt       DateTime          @default(now())
+
+  sessionId String
+  session   EvaluationSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id])
+
+  documents           ApplicationDocument[]
+  evaluationDrafts    EvaluationDraft[]
+  evaluationSubmissions EvaluationSubmission[]
+  resultSnapshots     ResultSnapshot[]
+
+  @@unique([sessionId, companyId])
+  @@map("application")
+}
+
+// ─── Application Document ───
+
+model ApplicationDocument {
+  id              String  @id @default(cuid())
+  docType         DocType @default(business_plan)
+  storageKey      String
+  originalFilename String
+  mimeType        String
+  fileSize        Int
+  sha256          String?
+  uploadedAt      DateTime @default(now())
+
+  applicationId String
+  application   Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  uploadedBy String?
+
+  @@map("application_document")
+}
+
+// ─── Committee Assignment ───
+
+model SessionCommitteeAssignment {
+  id        String   @id @default(cuid())
+  role      String   @default("member") // chair | member
+  assignedAt DateTime @default(now())
+
+  sessionId          String
+  session            EvaluationSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  committeeMemberId  String
+  committeeMember    CommitteeMember @relation(fields: [committeeMemberId], references: [id])
+
+  @@unique([sessionId, committeeMemberId])
+  @@map("session_committee_assignment")
+}
+
+// ─── Form Template ───
+
+model FormTemplate {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  isShared    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  createdById String?
+  versions    FormTemplateVersion[]
+
+  @@map("form_template")
+}
+
+model FormTemplateVersion {
+  id             String   @id @default(cuid())
+  versionNumber  Int
+  schemaJson     Json
+  totalScore     Float
+  itemsCount     Int
+  createdAt      DateTime @default(now())
+
+  templateId String
+  template   FormTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  @@unique([templateId, versionNumber])
+  @@map("form_template_version")
+}
+
+// ─── Evaluation Draft (autosave) ───
+
+model EvaluationDraft {
+  id          String   @id @default(cuid())
+  answersJson Json
+  version     Int      @default(1)
+  lastSavedAt DateTime @default(now())
+
+  applicationId      String
+  application        Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  committeeMemberId  String
+  committeeMember    CommitteeMember @relation(fields: [committeeMemberId], references: [id])
+
+  sessionId          String
+
+  @@unique([applicationId, committeeMemberId])
+  @@map("evaluation_draft")
+}
+
+// ─── Evaluation Submission (immutable) ───
+
+model EvaluationSubmission {
+  id                String          @id @default(cuid())
+  submissionState   SubmissionState @default(draft)
+  answersJson       Json
+  scoresJson        Json?
+  totalScore        Float?
+  isValid           Boolean         @default(true)
+  invalidatedReason String?
+  invalidatedAt     DateTime?
+  submittedAt       DateTime?
+  signedAt          DateTime?
+  ipAddress         String?
+  userAgent         String?
+  createdAt         DateTime        @default(now())
+
+  applicationId      String
+  application        Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  committeeMemberId  String
+  committeeMember    CommitteeMember @relation(fields: [committeeMemberId], references: [id])
+
+  sessionId          String
+
+  formSnapshotId String?
+  formSnapshot   SessionFormDefinition? @relation(fields: [formSnapshotId], references: [id])
+
+  signatureArtifact SignatureArtifact?
+
+  @@map("evaluation_submission")
+}
+
+// ─── Signature Artifact ───
+
+model SignatureArtifact {
+  id                      String   @id @default(cuid())
+  signatureImageStorageKey String
+  otpVerified             Boolean  @default(false)
+  otpPhone                String?
+  canonicalJsonHash       String
+  pdfHash                 String?
+  signerName              String
+  signedAt                DateTime @default(now())
+  ipAddress               String?
+  userAgent               String?
+  serverSeal              String
+  serverSealAlgorithm     String   @default("HMAC-SHA256")
+  createdAt               DateTime @default(now())
+
+  submissionId String @unique
+  submission   EvaluationSubmission @relation(fields: [submissionId], references: [id])
+
+  @@map("signature_artifact")
+}
+
+// ─── Result Snapshot ───
+
+model ResultSnapshot {
+  id               String   @id @default(cuid())
+  rawScoresJson    Json
+  trimmedScoresJson Json?
+  finalScore       Float
+  rank             Int
+  tieBreakNote     String?
+  computedAt       DateTime @default(now())
+  finalizedAt      DateTime?
+
+  applicationId String @unique
+  application   Application @relation(fields: [applicationId], references: [id])
+
+  sessionId String
+  session   EvaluationSession @relation(fields: [sessionId], references: [id])
+
+  computedById String?
+  computedBy   AdminUser? @relation("SnapshotComputer", fields: [computedById], references: [id])
+
+  @@map("result_snapshot")
+}
+
+// ─── Aggregation Run ───
+
+model AggregationRun {
+  id                String   @id @default(cuid())
+  triggerType       String   @default("manual") // auto | manual | reopen
+  triggerReason     String?
+  applicationsCount Int      @default(0)
+  successCount      Int      @default(0)
+  errorCount        Int      @default(0)
+  resultJson        Json?
+  computedAt        DateTime @default(now())
+
+  sessionId String
+  session   EvaluationSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  computedById String?
+  computedBy   AdminUser? @relation("AggregationComputer", fields: [computedById], references: [id])
+
+  @@map("aggregation_run")
+}
+
+// ─── Import Batch ───
+
+model ImportBatch {
+  id           String   @id @default(cuid())
+  filename     String
+  storageKey   String?
+  totalRows    Int      @default(0)
+  successCount Int      @default(0)
+  errorCount   Int      @default(0)
+  status       String   @default("pending") // pending | processing | completed | failed
+  importedAt   DateTime @default(now())
+
+  sessionId String
+  session   EvaluationSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  importedById String
+  importedBy   AdminUser @relation(fields: [importedById], references: [id])
+
+  errors ImportRowError[]
+
+  @@map("import_batch")
+}
+
+model ImportRowError {
+  id          String @id @default(cuid())
+  rowNumber   Int
+  rowDataJson Json
+  errorMessage String
+
+  batchId String
+  batch   ImportBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+
+  @@map("import_row_error")
+}
+
+// ─── Audit Event (append-only, tamper-evident) ───
+
+model AuditEvent {
+  id          String      @id @default(cuid())
+  occurredAt  DateTime    @default(now())
+  actorType   ActorType
+  actorId     String
+  action      AuditAction
+  targetType  String?
+  targetId    String?
+  requestId   String?
+  ipAddress   String?
+  userAgent   String?
+  payloadJson Json?
+  previousHash String?
+  eventHash    String?
+
+  sessionId String?
+  session   EvaluationSession? @relation(fields: [sessionId], references: [id])
+
+  // actorId는 polymorphic — actorType에 따라 admin_user.id 또는 committee_member.id를 참조
+  // Prisma는 polymorphic FK를 지원하지 않으므로 관계 필드 대신 ID만 저장
+
+  @@index([sessionId, occurredAt(sort: Desc)])
+  @@index([actorType, actorId, occurredAt(sort: Desc)])
+  @@map("audit_event")
+}
