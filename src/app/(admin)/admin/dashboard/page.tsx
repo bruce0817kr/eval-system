@@ -109,119 +109,131 @@ export default function AdminDashboardPage() {
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardDescription className="text-stone-600">진행 중인 평가</CardDescription>
-            <FolderKanban className="h-4 w-4 text-stone-400" />
-          </CardHeader>
-          <CardContent>
-            {loading ? (
-              <Skeleton className="h-8 w-20" />
-            ) : (
-              <CardTitle className="text-2xl font-semibold tracking-tight">
-                {stats?.openSessions ?? 0}
-              </CardTitle>
-            )}
-            <p className="text-xs text-stone-500 mt-1">
-              총 {stats?.totalSessions ?? 0}개 회차 중
-            </p>
-          </CardContent>
-        </Card>
+        <Link href="/admin/sessions?status=open">
+          <Card className="cursor-pointer hover:bg-stone-50 transition-colors">
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardDescription className="text-stone-600">진행 중인 평가</CardDescription>
+              <FolderKanban className="h-4 w-4 text-stone-400" />
+            </CardHeader>
+            <CardContent>
+              {loading ? (
+                <Skeleton className="h-8 w-20" />
+              ) : (
+                <CardTitle className="text-2xl font-semibold tracking-tight">
+                  {stats?.openSessions ?? 0}
+                </CardTitle>
+              )}
+              <p className="text-xs text-stone-500 mt-1">
+                총 {stats?.totalSessions ?? 0}개 회차 중
+              </p>
+            </CardContent>
+          </Card>
+        </Link>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardDescription className="text-stone-600">평가 완료</CardDescription>
-            <FileCheck className="h-4 w-4 text-stone-400" />
-          </CardHeader>
-          <CardContent>
-            {loading ? (
-              <Skeleton className="h-8 w-20" />
-            ) : (
-              <CardTitle className="text-2xl font-semibold tracking-tight">
-                {stats?.closedSessions ?? 0}
-              </CardTitle>
-            )}
-            <p className="text-xs text-stone-500 mt-1">
-              완료된 평가 회차
-            </p>
-          </CardContent>
-        </Card>
+        <Link href="/admin/sessions?status=closed">
+          <Card className="cursor-pointer hover:bg-stone-50 transition-colors">
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardDescription className="text-stone-600">평가 완료</CardDescription>
+              <FileCheck className="h-4 w-4 text-stone-400" />
+            </CardHeader>
+            <CardContent>
+              {loading ? (
+                <Skeleton className="h-8 w-20" />
+              ) : (
+                <CardTitle className="text-2xl font-semibold tracking-tight">
+                  {stats?.closedSessions ?? 0}
+                </CardTitle>
+              )}
+              <p className="text-xs text-stone-500 mt-1">
+                완료된 평가 회차
+              </p>
+            </CardContent>
+          </Card>
+        </Link>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardDescription className="text-stone-600">총 기업 수</CardDescription>
-            <Building2 className="h-4 w-4 text-stone-400" />
-          </CardHeader>
-          <CardContent>
-            {loading ? (
-              <Skeleton className="h-8 w-20" />
-            ) : (
-              <CardTitle className="text-2xl font-semibold tracking-tight">
-                {stats?.totalApplications ?? 0}
-              </CardTitle>
-            )}
-            <p className="text-xs text-stone-500 mt-1">
-              신청 완료된 기업
-            </p>
-          </CardContent>
-        </Card>
+        <Link href="/admin/companies">
+          <Card className="cursor-pointer hover:bg-stone-50 transition-colors">
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardDescription className="text-stone-600">총 기업 수</CardDescription>
+              <Building2 className="h-4 w-4 text-stone-400" />
+            </CardHeader>
+            <CardContent>
+              {loading ? (
+                <Skeleton className="h-8 w-20" />
+              ) : (
+                <CardTitle className="text-2xl font-semibold tracking-tight">
+                  {stats?.totalApplications ?? 0}
+                </CardTitle>
+              )}
+              <p className="text-xs text-stone-500 mt-1">
+                신청 완료된 기업
+              </p>
+            </CardContent>
+          </Card>
+        </Link>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardDescription className="text-stone-600">평가 예정</CardDescription>
-            <Clock className="h-4 w-4 text-stone-400" />
-          </CardHeader>
-          <CardContent>
-            {loading ? (
-              <Skeleton className="h-8 w-20" />
-            ) : (
-              <CardTitle className="text-2xl font-semibold tracking-tight">
-                {stats?.draftSessions ?? 0}
-              </CardTitle>
-            )}
-            <p className="text-xs text-stone-500 mt-1">
-              아직 시작 전
-            </p>
-          </CardContent>
-        </Card>
+        <Link href="/admin/sessions?status=draft">
+          <Card className="cursor-pointer hover:bg-stone-50 transition-colors">
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardDescription className="text-stone-600">평가 예정</CardDescription>
+              <Clock className="h-4 w-4 text-stone-400" />
+            </CardHeader>
+            <CardContent>
+              {loading ? (
+                <Skeleton className="h-8 w-20" />
+              ) : (
+                <CardTitle className="text-2xl font-semibold tracking-tight">
+                  {stats?.draftSessions ?? 0}
+                </CardTitle>
+              )}
+              <p className="text-xs text-stone-500 mt-1">
+                아직 시작 전
+              </p>
+            </CardContent>
+          </Card>
+        </Link>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardDescription className="text-stone-600">평가위원</CardDescription>
-            <Users className="h-4 w-4 text-stone-400" />
-          </CardHeader>
-          <CardContent>
-            {loading ? (
-              <Skeleton className="h-8 w-20" />
-            ) : (
-              <CardTitle className="text-2xl font-semibold tracking-tight">
-                {stats?.totalCommitteeMembers ?? 0}
-              </CardTitle>
-            )}
-            <p className="text-xs text-stone-500 mt-1">
-              활성화된 평가위원
-            </p>
-          </CardContent>
-        </Card>
+        <Link href="/admin/committee">
+          <Card className="cursor-pointer hover:bg-stone-50 transition-colors">
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardDescription className="text-stone-600">평가위원</CardDescription>
+              <Users className="h-4 w-4 text-stone-400" />
+            </CardHeader>
+            <CardContent>
+              {loading ? (
+                <Skeleton className="h-8 w-20" />
+              ) : (
+                <CardTitle className="text-2xl font-semibold tracking-tight">
+                  {stats?.totalCommitteeMembers ?? 0}
+                </CardTitle>
+              )}
+              <p className="text-xs text-stone-500 mt-1">
+                활성화된 평가위원
+              </p>
+            </CardContent>
+          </Card>
+        </Link>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardDescription className="text-stone-600">전체 회차</CardDescription>
-            <FolderKanban className="h-4 w-4 text-stone-400" />
-          </CardHeader>
-          <CardContent>
-            {loading ? (
-              <Skeleton className="h-8 w-20" />
-            ) : (
-              <CardTitle className="text-2xl font-semibold tracking-tight">
-                {stats?.totalSessions ?? 0}
-              </CardTitle>
-            )}
-            <p className="text-xs text-stone-500 mt-1">
-              전체 평가 회차
-            </p>
-          </CardContent>
-        </Card>
+        <Link href="/admin/sessions">
+          <Card className="cursor-pointer hover:bg-stone-50 transition-colors">
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardDescription className="text-stone-600">전체 회차</CardDescription>
+              <FolderKanban className="h-4 w-4 text-stone-400" />
+            </CardHeader>
+            <CardContent>
+              {loading ? (
+                <Skeleton className="h-8 w-20" />
+              ) : (
+                <CardTitle className="text-2xl font-semibold tracking-tight">
+                  {stats?.totalSessions ?? 0}
+                </CardTitle>
+              )}
+              <p className="text-xs text-stone-500 mt-1">
+                전체 평가 회차
+              </p>
+            </CardContent>
+          </Card>
+        </Link>
       </div>
 
       <Card>
