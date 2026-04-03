@@ -5,7 +5,7 @@ import { z } from 'zod'
 
 import { logAuditEvent as logAudit } from '@/lib/audit'
 import { verifySession } from '@/lib/auth/jwt'
-import { verifyOtp } from '@/lib/auth/otp'
+import { verifyOtpViaOctomo } from '@/lib/auth/otp'
 import { prisma } from '@/lib/db'
 import { uploadFile } from '@/lib/storage'
 
@@ -152,7 +152,7 @@ export async function POST(
       return NextResponse.json({ error: '이미 서명 완료된 제출입니다' }, { status: 409 })
     }
 
-    const otpVerified = await verifyOtp(member.phone.replace(/-/g, ''), parsed.data.otpCode)
+    const otpVerified = await verifyOtpViaOctomo(member.phone.replace(/-/g, ''), parsed.data.otpCode)
 
     if (!otpVerified) {
       return NextResponse.json({ error: 'OTP 인증번호가 올바르지 않습니다' }, { status: 401 })

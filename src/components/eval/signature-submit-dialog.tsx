@@ -30,6 +30,13 @@ type SignatureSubmitDialogProps = {
   onSigned: () => void
 }
 
+type RequestOtpResponse = {
+  message: string
+  code: string
+  targetNumber: string
+  instructions: string
+}
+
 function getMissingRequired(schema: FormSchema, answers: Record<string, unknown>) {
   const missing: string[] = []
 
@@ -73,6 +80,7 @@ export function SignatureSubmitDialog({
   const [otpCode, setOtpCode] = useState('')
   const [isOtpSending, setIsOtpSending] = useState(false)
   const [otpSent, setOtpSent] = useState(false)
+  const [otpData, setOtpData] = useState<RequestOtpResponse | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
@@ -100,6 +108,7 @@ export function SignatureSubmitDialog({
       setError(null)
       setOtpCode('')
       setOtpSent(false)
+      setOtpData(null)
     }
   }, [open])
 
@@ -152,6 +161,8 @@ export function SignatureSubmitDialog({
         throw new Error(data?.error ?? 'OTP 요청에 실패했습니다')
       }
 
+      const data = (await response.json()) as RequestOtpResponse
+      setOtpData(data)
       setOtpSent(true)
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : 'OTP 요청에 실패했습니다')
@@ -282,6 +293,15 @@ export function SignatureSubmitDialog({
 
           {step === 3 ? (
             <div className="space-y-3 rounded-lg border p-3">
+              {otpData && (
+                <div className="rounded-md border border-primary/20 bg-primary/5 p-3 space-y-2">
+                  <p className="text-sm font-medium text-primary">인증번호: {otpData.code}</p>
+                  <p className="text-xs text-stone-600">{otpData.instructions}</p>
+                  <p className="text-xs text-stone-500">
+                    전송 후 잠시 기다려주세요. SMS 수신 확인 후 인증번호를 입력하세요.
+                  </p>
+                </div>
+              )}
               <div className="space-y-1">
                 <Label htmlFor="otp-code">OTP 인증번호</Label>
                 <Input

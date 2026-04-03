@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server'
 import { z } from 'zod'
 
 import { logAuditEvent as writeAuditEvent } from '@/lib/audit'
-import { verifyOtp } from '@/lib/auth/otp'
+import { verifyOtpViaOctomo } from '@/lib/auth/otp'
 import { prisma } from '@/lib/db'
 
 const verifyOtpSchema = z.object({
@@ -130,7 +130,7 @@ export async function POST(request: Request) {
     },
   })
 
-  const isValid = member !== null && (await verifyOtp(normalizedPhone, code))
+  const isValid = member !== null && (await verifyOtpViaOctomo(normalizedPhone, code))
 
   if (!isValid || member === null) {
     await safeLogAuditEvent({

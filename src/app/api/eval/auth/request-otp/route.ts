@@ -2,8 +2,10 @@ import { NextResponse } from 'next/server'
 import { z } from 'zod'
 
 import { logAuditEvent as writeAuditEvent } from '@/lib/audit'
-import { generateOtp, rateLimitOtp } from '@/lib/auth/otp'
+import { generateOtp, rateLimitOtp, storeOtpForOctomo } from '@/lib/auth/otp'
 import { prisma } from '@/lib/db'
+
+const OCTOMO_TARGET_NUMBER = process.env.OCTOMO_TARGET_NUMBER ?? '1666-3538'
 
 const requestOtpSchema = z.object({
   name: z.string().trim().min(1, '이름을 입력해주세요'),
@@ -109,7 +111,9 @@ export async function POST(request: Request) {
     )
   }
 
-  await generateOtp(normalizedPhone)
+  const code = await generateOtp(normalizedPhone)
+  await storeOtpForOctomo(normalizedPhone, code)
+
   await safeLogAuditEvent({
     actorType: 'committee_member',
     actorId: member.id,
@@ -126,7 +130,12 @@ export async function POST(request: Request) {
   })
 
   return NextResponse.json(
-    { message: '인증번호가 전송되었습니다' },
+    {
+      message: '인증번호가 생성되었습니다',
+      code,
+      targetNumber: OCTOMO_TARGET_NUMBER,
+      instructions: `아래 인증번호를 ${OCTOMO_TARGET_NUMBER}로 전송해주세요.`,
+    },
     { status: 200 },
   )
 }

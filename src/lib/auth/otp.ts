@@ -196,3 +196,74 @@ export async function rateLimitOtp(phone: string): Promise<boolean> {
   rateLimitStore.set(phone, [...entries, now])
   return true
 }
+
+const OCTOMO_API_URL = 'https://api.octoverse.kr/octomo/v1/public/message/exists'
+const OCTOMO_TTL_SECONDS = 60 * 5
+
+export async function verifyOtpViaOctomo(
+  phone: string,
+  code: string,
+): Promise<boolean> {
+  const apiKey = process.env.OCTOMO_API_KEY
+
+  if (!apiKey) {
+    console.error('OCTOMO_API_KEY is not configured')
+    return false
+  }
+
+  const normalizedPhone = phone.replace(/-/g, '')
+
+  try {
+    const response = await fetch(OCTOMO_API_URL, {
+      method: 'POST',
+      headers: {
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+        Authorization: `Octomo ${apiKey}`,
+      },
+      body: JSON.stringify({
+        mobileNum: normalizedPhone,
+        text: code,
+      }),
+    })
+
+    if (!response.ok) {
+      console.error('OCTOMO API error:', response.status, await response.text())
+      return false
+    }
+
+    const result = (await response.json()) as { verified: boolean }
+
+    return result.verified === true
+  } catch (error) {
+    console.error('OCTOMO API call failed:', error)
+    return false
+  }
+}
+
+export async function storeOtpForOctomo(
+  phone: string,
+  code: string,
+): Promise<void> {
+  const redis = await getRedisClient()
+  const normalizedPhone = phone.replace(/-/g, '')
+
+  if (redis) {
+    try {
+      await redis.set(
+        getOtpKey(normalizedPhone),
+        code,
+        'EX',
+        OCTOMO_TTL_SECONDS,
+      )
+      return
+    } catch {
+      redisClient = null
+    }
+  }
+
+  otpStore.set(normalizedPhone, {
+    code,
+    expiresAt: Date.now() + OCTOMO_TTL_SECONDS * 1000,
+  })
+}

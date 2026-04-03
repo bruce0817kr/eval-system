@@ -24,6 +24,13 @@ type LoginFormValues = {
   otp: string
 }
 
+type RequestOtpResponse = {
+  message: string
+  code: string
+  targetNumber: string
+  instructions: string
+}
+
 const steps = ["기본 정보", "인증번호", "접속 완료"]
 
 export default function EvalLoginPage() {
@@ -32,6 +39,7 @@ export default function EvalLoginPage() {
   const [error, setError] = useState<string | null>(null)
   const [isRequestingOtp, setIsRequestingOtp] = useState(false)
   const [isVerifyingOtp, setIsVerifyingOtp] = useState(false)
+  const [otpData, setOtpData] = useState<RequestOtpResponse | null>(null)
   const form = useForm<LoginFormValues>({
     defaultValues: {
       name: "",
@@ -74,6 +82,8 @@ export default function EvalLoginPage() {
         throw new Error(data?.error ?? "인증번호 요청에 실패했습니다")
       }
 
+      const data = (await response.json()) as RequestOtpResponse
+      setOtpData(data)
       setStep(2)
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : "인증번호 요청에 실패했습니다")
@@ -181,19 +191,27 @@ export default function EvalLoginPage() {
               )}
 
               {step === 2 && (
-                <div className="space-y-2">
-                  <Label htmlFor="otp">인증번호</Label>
-                  <Input
-                    id="otp"
-                    inputMode="numeric"
-                    autoComplete="one-time-code"
-                    maxLength={6}
-                    placeholder="6자리 인증번호를 입력하세요"
-                    {...form.register("otp", { required: true })}
-                  />
-                  <p className="text-xs text-stone-500">
-                    입력한 전화번호로 전송된 인증번호를 입력하세요.
-                  </p>
+                <div className="space-y-3">
+                  {otpData && (
+                    <div className="rounded-md border border-primary/20 bg-primary/5 p-3 space-y-2">
+                      <p className="text-sm font-medium text-primary">인증번호: {otpData.code}</p>
+                      <p className="text-xs text-stone-600">{otpData.instructions}</p>
+                      <p className="text-xs text-stone-500">
+                        전송 후 잠시 기다려주세요. SMS 수신 확인 후 인증번호를 입력하세요.
+                      </p>
+                    </div>
+                  )}
+                  <div className="space-y-2">
+                    <Label htmlFor="otp">인증번호</Label>
+                    <Input
+                      id="otp"
+                      inputMode="numeric"
+                      autoComplete="one-time-code"
+                      maxLength={6}
+                      placeholder="6자리 인증번호를 입력하세요"
+                      {...form.register("otp", { required: true })}
+                    />
+                  </div>
                 </div>
               )}
 
