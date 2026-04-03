@@ -378,19 +378,58 @@ docker exec eval-minio-1 mc ls minio/
 
 ---
 
-## 16. 향후 개선사항
+## 16. E2E 테스트 인프라 (Playwright)
 
-1. ~~**SMS OTP 연동**~~ - ✅ OCTOMO 무료 SMS 연동 완료 (2026-04-03)
-2. **중복 제출 방지** - submit API에 existing submission check 추가 (TODO)
-3. **서명 완료 후 리다이렉트** - 평가 완료 시 목록으로 이동 (TODO)
-4. 실시간 WebSocket 통신 - 평가 진행 상황 실시간 업데이트
-5. 관리자 템플릿 할당 UI - 세션 설정에서 평가표 템플릿 선택 UI
-6. 이메일 알림 - 평가 할당, 완료 알림
-7. 다국어 지원 - i18n 프레임워크 적용
+### 16.1 설정 파일
+| 파일 | 용도 |
+|------|------|
+| `playwright.config.ts` | Playwright 설정 (Chrome, retries, reporters) |
+| `tests/helpers.ts` | Redis OTP 조회, 대기 유틸리티 |
+| `tests/page-objects.ts` | EvaluatorLoginPage Page Object Model |
+| `tests/eval-login.spec.ts` | 로그인 E2E 테스트 |
+
+### 16.2 npm 스크립트
+```bash
+npm test        # headless로 테스트 실행
+npm run test:ui     # Playwright UI로 테스트 실행
+npm run test:headed # headed 모드로 테스트 실행
+```
+
+### 16.3 환경변수 (.env.test.local)
+```bash
+E2E_EVALUATOR_PHONE=01011111111
+E2E_EVALUATOR_NAME=김평가
+OCTOMO_API_KEY=your-key
+```
+
+### 16.4 테스트 실행 전 준비
+```bash
+# 1. Playwright 브라우저 설치 (初回)
+npx playwright install
+
+# 2. 개발 서버 실행
+npm run dev
+
+# 3. 테스트 실행
+npm test
+```
 
 ---
 
-## 17. 연락처
+## 17. 향후 개선사항
+
+1. ~~**SMS OTP 연동**~~ - ✅ OCTOMO 무료 SMS 연동 완료 (2026-04-03)
+2. ~~**중복 제출 방지**~~ - ✅ submit API에 existing submission check (2026-04-03)
+3. ~~**서명 완료 후 리다이렉트**~~ - ✅ 서명 완료 시 목록 이동 (2026-04-03)
+4. ~~**E2E 테스트 인프라**~~ - ✅ Playwright 설정 완료 (2026-04-03)
+5. 실시간 WebSocket 통신 - 평가 진행 상황 실시간 업데이트
+6. 관리자 템플릿 할당 UI - 세션 설정에서 평가표 템플릿 선택 UI
+7. 이메일 알림 - 평가 할당, 완료 알림
+8. 다국어 지원 - i18n 프레임워크 적용
+
+---
+
+## 18. 연락처
 
 | 역할 | 담당 |
 |------|------|
