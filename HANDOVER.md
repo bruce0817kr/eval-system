@@ -1,7 +1,7 @@
 # 인수인계서 (Handover Document)
 
 **프로젝트**: 중소기업 지원사업 선정평가 시스템  
-**버전**: 1.1  
+**버전**: 1.2  
 **작성일**: 2026-04-03  
 **작성자**: AI Engineering Team
 
@@ -176,7 +176,7 @@ npm start
 
 ## 8. 주요 수정 이력
 
-### 2026-04-03 업데이트
+### 2026-04-03 업데이트 (v1.2)
 
 | # | 이슈 | 수정 파일 |
 |---|------|----------|
@@ -184,6 +184,11 @@ npm start
 | 2 | PDF 문서 업로드 API | `api/admin/sessions/[sessionId]/applications/[applicationId]/documents/route.ts` |
 | 3 | 호스트 머신 백업 스크립트 | `scripts/host-backup.sh`, `scripts/restore.sh` |
 | 4 | PostgreSQL WAL 권한 수정 | `wal_archive` 볼륨 postgres:postgres 권한 |
+| 5 | **OCTOMO 무료 SMS OTP 연동** | `otp.ts`, `verify-otp/route.ts`, `sign/route.ts` |
+| 6 | **평가 UI 개선** | PDF 뷰어 페이지네비게이션, 평가표 섹션 완료 표시, 모바일 최적화 |
+| 7 | **any 타입 제거** | `aggregate/route.ts`, `results/excel/route.ts`, `aggregations/page.tsx` |
+
+### 2026-04-02 코드 리뷰 후 수정 사항
 
 ### 2026-04-02 코드 리뷰 후 수정 사항
 
@@ -213,10 +218,22 @@ npm start
 | operator | 평가 운영 (집계, 내보내기 포함) |
 | auditor | 읽기 전용 |
 
-### 9.3 OTP 설정
-- 현재 CoolSMS/NHN Cloud 연동 대기
-- SMS 발송 없이 OTP 검증 로직만 구현됨
-- 실제 SMS 연동 시 `src/lib/auth/otp.ts` 수정 필요
+### 9.3 OTP 설정 (OCTOMO 무료 SMS)
+- **OCTOMO API** 사용 (무료 MO 문자)
+- 사용자가 1666-3538로 인증코드 SMS 전송
+- 서버가 OCTOMO API로 수신 확인
+- 월 10,000건 무료 (Beta)
+
+**환경변수 설정**:
+```bash
+OCTOMO_API_KEY="your-api-key"
+OCTOMO_TARGET_NUMBER="1666-3538"
+```
+
+**관련 파일**:
+- `src/lib/auth/otp.ts` - `verifyOtpViaOctomo()`, `storeOtpForOctomo()`
+- `src/app/api/eval/auth/request-otp/route.ts` - OTP 생성 + 코드 반환
+- `src/app/api/eval/auth/verify-otp/route.ts` - OCTOMO API 검증
 
 ### 9.4 서명 원본성
 - HMAC-SHA256 기반 canonical JSON 해시
@@ -363,11 +380,13 @@ docker exec eval-minio-1 mc ls minio/
 
 ## 16. 향후 개선사항
 
-1. **실시간 WebSocket 통신** - 평가 진행 상황 실시간 업데이트
-2. **관리자 템플릿 할당 UI** - 세션 설정에서 평가표 템플릿 선택 UI
-3. **SMS OTP 연동** - CoolSMS/NHN Cloud 실제 연동
-4. **이메일 알림** - 평가 할당, 완료 알림
-5. **다국어 지원** - i18n 프레임워크 적용
+1. ~~**SMS OTP 연동**~~ - ✅ OCTOMO 무료 SMS 연동 완료 (2026-04-03)
+2. **중복 제출 방지** - submit API에 existing submission check 추가 (TODO)
+3. **서명 완료 후 리다이렉트** - 평가 완료 시 목록으로 이동 (TODO)
+4. 실시간 WebSocket 통신 - 평가 진행 상황 실시간 업데이트
+5. 관리자 템플릿 할당 UI - 세션 설정에서 평가표 템플릿 선택 UI
+6. 이메일 알림 - 평가 할당, 완료 알림
+7. 다국어 지원 - i18n 프레임워크 적용
 
 ---
 
