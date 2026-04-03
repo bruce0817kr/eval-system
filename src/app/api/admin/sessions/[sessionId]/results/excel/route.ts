@@ -2,6 +2,15 @@ import * as XLSX from 'xlsx'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { getAdminSession, requireRole } from '@/lib/auth/jwt'
+import type { FormSchema } from '@/lib/form-template-schema'
+
+type CriteriaDataEntry = {
+  '대분류': string
+  '항목ID': string
+  '항목명': string
+  '배점': number
+  '최고점수': number
+}
 
 function escapeCellValue(value: unknown): unknown {
   if (typeof value === 'string') {
@@ -128,19 +137,19 @@ export async function GET(
       XLSX.utils.book_append_sheet(workbook, mainWs, '평가결과')
 
       if (evalSession.formDefinition?.schemaJson) {
-        const schema = evalSession.formDefinition.schemaJson as any
-        const criteriaData: any[] = []
+        const schema = evalSession.formDefinition.schemaJson as FormSchema
+        const criteriaData: CriteriaDataEntry[] = []
         
         if (schema.sections) {
           for (const section of schema.sections) {
             for (const item of section.items) {
               if (item.type === 'radio_score') {
                 criteriaData.push({
-                  '대분류': section.title || section.label || '기본',
+                  '대분류': section.title || '기본',
                   '항목ID': item.id,
                   '항목명': item.label,
                   '배점': item.weight,
-                  '최고점수': item.options ? Math.max(...item.options.map((o: any) => o.score)) : 0
+                  '최고점수': item.options ? Math.max(...item.options.map((o) => o.score)) : 0
                 })
               }
             }

@@ -3,6 +3,7 @@ import { prisma } from '@/lib/db'
 import { getAdminSession, requireRole } from '@/lib/auth/jwt'
 import { audit } from '@/lib/audit'
 import { EvaluationSession, SessionStatus } from '@/generated/prisma/client'
+import type { FormSchema, FormSection, FormItem } from '@/lib/form-template-schema'
 
 export async function POST(
   request: NextRequest,
@@ -153,7 +154,7 @@ export async function POST(
           })
 
           let finalScore = 0
-          const schemaJson = formDefinition.schemaJson as { sections?: any[] } | null
+          const schemaJson = formDefinition.schemaJson as FormSchema | null
           if (!schemaJson?.sections) {
             return {
               applicationId: application.id,
@@ -163,7 +164,7 @@ export async function POST(
           }
           const sections = schemaJson.sections
           sections.forEach(section => {
-            section.items.forEach((item: any) => {
+            section.items.forEach((item: FormItem) => {
               if (item.type === 'radio_score' && trimmedScoresJson[item.id] !== undefined) {
                 finalScore += trimmedScoresJson[item.id] * (item.weight / 100)
               }

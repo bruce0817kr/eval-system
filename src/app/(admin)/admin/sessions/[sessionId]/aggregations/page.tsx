@@ -37,7 +37,17 @@ export default function AdminSessionAggregationsPage() {
       applicationsCount: number;
       successCount: number;
       errorCount: number;
-      resultJson: any;
+      resultJson: {
+        results?: Array<{
+          applicationId: string;
+          companyName?: string;
+          finalScore?: number | null;
+          rank?: number | null;
+          error?: string | null;
+        }>;
+        computedAt?: string;
+        error?: string;
+      } | null;
       computedAt: string;
       computedBy: {
         id: string;
@@ -205,7 +215,7 @@ export default function AdminSessionAggregationsPage() {
                     </TableCell>
                     <TableCell>
                       <Link
-                        href={`/admin/sessions/${sessionId}/aggregations/${agg.id}` as any}
+                        href={`/admin/sessions/${sessionId}/aggregations/${agg.id}`}
                         className="text-sm font-medium text-primary hover:underline"
                       >
                         상세 보기
