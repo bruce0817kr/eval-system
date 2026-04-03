@@ -5,7 +5,7 @@ export async function getOTPFromRedis(phone: string): Promise<string | null> {
   const normalized = phone.replace(/-/g, '')
   try {
     const result = execSync(
-      `docker exec eval-redis-1 redis-cli -p 6379 GET "otp:${normalized}"`,
+      `docker exec eval-redis redis-cli -p 6379 GET "otp:${normalized}"`,
       { encoding: 'utf8' },
     )
     return result.trim() || null
@@ -63,7 +63,7 @@ export async function clearRedisOTP(phone: string): Promise<void> {
   const normalized = phone.replace(/-/g, '')
   try {
     execSync(
-      `docker exec eval-redis-1 redis-cli -p 6379 DEL "otp:${normalized}"`,
+      `docker exec eval-redis redis-cli -p 6379 DEL "otp:${normalized}"`,
     )
   } catch {
     // Empty catch - cleanup failures are non-critical

@@ -37,10 +37,83 @@ export class EvalLoginPage {
   }
 }
 
-export const test = base.extend<{ evalLoginPage: EvalLoginPage }>({
+export class EvalSessionsPage {
+  readonly page: Page
+  readonly sessionCards: Locator
+
+  constructor(page: Page) {
+    this.page = page
+    this.sessionCards = page.locator('.cursor-pointer')
+  }
+
+  async goto() {
+    await this.page.goto('/eval/sessions')
+  }
+
+  async selectSession(sessionTitle: string) {
+    await this.page.locator(`text=${sessionTitle}`).click()
+  }
+}
+
+export class EvalSessionApplicationsPage {
+  readonly page: Page
+  readonly applicationCards: Locator
+
+  constructor(page: Page) {
+    this.page = page
+    this.applicationCards = page.locator('.cursor-pointer')
+  }
+
+  async selectApplication(companyName: string) {
+    await this.page.locator(`.cursor-pointer:has-text("${companyName}")`).click()
+  }
+}
+
+export class EvalEvaluationPage {
+  readonly page: Page
+  readonly pdfTab: Locator
+  readonly formTab: Locator
+  readonly saveDraftButton: Locator
+  readonly submitButton: Locator
+
+  constructor(page: Page) {
+    this.page = page
+    this.pdfTab = page.locator('button:has-text("PDF 문서")')
+    this.formTab = page.locator('button:has-text("평가표")')
+    this.saveDraftButton = page.locator('button:has-text("초안 저장")')
+    this.submitButton = page.locator('button:has-text("제출")')
+  }
+
+  async waitForLoad() {
+    await this.page.waitForSelector('text=평가 대상 기업', { timeout: 10000 })
+  }
+
+  async waitForEvaluationPage() {
+    await this.page.waitForSelector('text=작성', { timeout: 10000 })
+  }
+}
+
+export const test = base.extend<{
+  evalLoginPage: EvalLoginPage
+  evalSessionsPage: EvalSessionsPage
+  evalSessionApplicationsPage: EvalSessionApplicationsPage
+  evalEvaluationPage: EvalEvaluationPage
+}>({
   evalLoginPage: async ({ page }, use) => {
     const evalLoginPage = new EvalLoginPage(page)
     await use(evalLoginPage)
+  },
+  evalSessionsPage: async ({ page }, use) => {
+    const evalSessionsPage = new EvalSessionsPage(page)
+    await use(evalSessionsPage)
+  },
+  evalSessionApplicationsPage: async ({ page }, use) => {
+    const evalSessionApplicationsPage = new EvalSessionApplicationsPage(page)
+    await use(evalSessionApplicationsPage)
+  },
+  evalEvaluationPage: async ({ page }, use) => {
+    const evalEvaluationPage = new EvalEvaluationPage(page)
+    await use(evalEvaluationPage)
   },
 })
 

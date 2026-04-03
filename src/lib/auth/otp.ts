@@ -55,12 +55,17 @@ async function loadRedisModule(): Promise<RedisModule | null> {
   }
 }
 
+function normalizePhone(phone: string): string {
+  return phone.replace(/-/g, '')
+}
+
 function getOtpKey(phone: string): string {
-  return `otp:${phone}`
+  // 항상 정규화된 폰 번호(dash 없음)를 키로 사용
+  return `otp:${normalizePhone(phone)}`
 }
 
 function getRateLimitKey(phone: string): string {
-  return `otp:rate:${phone}`
+  return `otp:rate:${normalizePhone(phone)}`
 }
 
 async function getRedisClient(): Promise<RedisLike | null> {
@@ -246,7 +251,7 @@ export async function storeOtpForOctomo(
   code: string,
 ): Promise<void> {
   const redis = await getRedisClient()
-  const normalizedPhone = phone.replace(/-/g, '')
+  const normalizedPhone = normalizePhone(phone)
 
   if (redis) {
     try {
