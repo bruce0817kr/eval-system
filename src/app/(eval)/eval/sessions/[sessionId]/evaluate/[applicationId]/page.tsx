@@ -71,6 +71,7 @@ export default function EvalApplicationEvaluatePage() {
   const [dialogOpen, setDialogOpen] = useState(false)
   const [evaluatorName, setEvaluatorName] = useState('')
   const [evaluatorPhone, setEvaluatorPhone] = useState('')
+  const [activeTab, setActiveTab] = useState<'pdf' | 'form'>('pdf')
 
   const answersRef = useRef<Record<string, unknown>>({})
   const versionRef = useRef(0)
@@ -309,7 +310,7 @@ export default function EvalApplicationEvaluatePage() {
   }
 
   return (
-    <div className="h-[calc(100svh-3.5rem)] p-2 md:p-3">
+    <div className="flex h-[calc(100svh-3.5rem)] flex-col p-2 md:p-3">
       <div className="mb-2 flex items-center justify-between rounded-md border bg-white px-3 py-2">
         <div className="space-y-1">
           <p className="text-sm text-stone-500">평가 대상 기업</p>
@@ -321,25 +322,75 @@ export default function EvalApplicationEvaluatePage() {
         </div>
       </div>
 
-      <ResizablePanelGroup orientation="horizontal" className="rounded-lg border bg-white">
-        <ResizablePanel defaultSize={70} minSize={40}>
-          <PdfViewer documents={documents} />
-        </ResizablePanel>
-        <ResizableHandle withHandle />
-        <ResizablePanel defaultSize={30} minSize={28}>
-          <EvaluationForm
-            schema={schema}
-            answers={answers}
-            onAnswerChange={handleAnswerChange}
-            onFieldBlur={handleFieldBlur}
-            onSaveDraft={() => void saveDraft()}
-            onSubmit={() => setDialogOpen(true)}
-            saveStatus={saveStatus}
-            isSaving={isSaving}
-            isSubmitDisabled={isSigned}
-          />
-        </ResizablePanel>
-      </ResizablePanelGroup>
+      {/* Mobile Tab Switcher */}
+      <div className="mb-2 flex gap-1 md:hidden">
+        <button
+          type="button"
+          onClick={() => setActiveTab('pdf')}
+          className={`flex-1 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
+            activeTab === 'pdf'
+              ? 'bg-primary text-primary-foreground'
+              : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
+          }`}
+        >
+          PDF 문서
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab('form')}
+          className={`flex-1 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
+            activeTab === 'form'
+              ? 'bg-primary text-primary-foreground'
+              : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
+          }`}
+        >
+          평가표
+        </button>
+      </div>
+
+      {/* Desktop: Side-by-side | Mobile: Tab-based */}
+      <div className="flex-1 overflow-hidden rounded-lg border bg-white">
+        {/* Desktop Layout */}
+        <ResizablePanelGroup orientation="horizontal" className="hidden h-full md:flex">
+          <ResizablePanel defaultSize={70} minSize={40}>
+            <PdfViewer documents={documents} />
+          </ResizablePanel>
+          <ResizableHandle withHandle />
+          <ResizablePanel defaultSize={30} minSize={28}>
+            <EvaluationForm
+              schema={schema}
+              answers={answers}
+              onAnswerChange={handleAnswerChange}
+              onFieldBlur={handleFieldBlur}
+              onSaveDraft={() => void saveDraft()}
+              onSubmit={() => setDialogOpen(true)}
+              saveStatus={saveStatus}
+              isSaving={isSaving}
+              isSubmitDisabled={isSigned}
+            />
+          </ResizablePanel>
+        </ResizablePanelGroup>
+
+        {/* Mobile Layout */}
+        <div className="flex h-full flex-col md:hidden">
+          <div className={`flex-1 overflow-hidden ${activeTab === 'pdf' ? 'block' : 'hidden'}`}>
+            <PdfViewer documents={documents} />
+          </div>
+          <div className={`flex-1 overflow-hidden ${activeTab === 'form' ? 'block' : 'hidden'}`}>
+            <EvaluationForm
+              schema={schema}
+              answers={answers}
+              onAnswerChange={handleAnswerChange}
+              onFieldBlur={handleFieldBlur}
+              onSaveDraft={() => void saveDraft()}
+              onSubmit={() => setDialogOpen(true)}
+              saveStatus={saveStatus}
+              isSaving={isSaving}
+              isSubmitDisabled={isSigned}
+            />
+          </div>
+        </div>
+      </div>
 
       <SignatureSubmitDialog
         open={dialogOpen}
