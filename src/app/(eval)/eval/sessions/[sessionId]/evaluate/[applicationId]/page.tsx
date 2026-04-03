@@ -404,6 +404,9 @@ export default function EvalApplicationEvaluatePage() {
         onSigned={() => {
           setIsSigned(true)
           setSaveStatus('saved')
+          setTimeout(() => {
+            router.push(`/eval/sessions/${sessionId}`)
+          }, 1500)
         }}
       />
     </div>

@@ -170,6 +170,36 @@ export async function POST(
 
     const { applicationId, answersJson } = parsed.data
 
+    const existingSubmission = await prisma.evaluationSubmission.findFirst({
+      where: {
+        applicationId,
+        committeeMemberId,
+        sessionId,
+      },
+      select: {
+        id: true,
+        submissionState: true,
+      },
+    })
+
+    if (existingSubmission) {
+      if (existingSubmission.submissionState === 'signed') {
+        return NextResponse.json(
+          { error: '이미 서명이 완료된 평가입니다. 다시 제출할 수 없습니다.' },
+          { status: 409 },
+        )
+      }
+
+      return NextResponse.json(
+        {
+          error: '이미 제출된 평가입니다.',
+          existingSubmissionId: existingSubmission.id,
+          submissionState: existingSubmission.submissionState,
+        },
+        { status: 409 },
+      )
+    }
+
     const [application, formDefinition] = await Promise.all([
       prisma.application.findFirst({
         where: {
