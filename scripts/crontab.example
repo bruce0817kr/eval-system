@@ -1,0 +1,18 @@
+# Eval DB Backup Cron Schedule
+# Install: copy this file to /etc/cron.d/eval-backup
+# Or run: crontab -e
+
+# Environment variables - set these before running
+# export S3_ACCESS_KEY=your_access_key
+# export S3_SECRET_KEY=your_secret_key
+# export S3_BUCKET=eval-backups
+# export PGHOST=localhost
+# export PGPORT=5433
+# export PGUSER=eval
+# export PGPASSWORD=your_password
+
+# Daily base backup at 2:00 AM
+0 2 * * * root /Project/eval/scripts/host-backup.sh full >> /var/log/eval-backup.log 2>&1
+
+# Hourly WAL upload
+30 * * * * root /Project/eval/scripts/host-backup.sh wal >> /var/log/eval-backup.log 2>&1

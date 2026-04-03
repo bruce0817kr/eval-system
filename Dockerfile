@@ -1,6 +1,3 @@
-# ============================================
-# Stage 1: Dependencies
-# ============================================
 FROM node:22-alpine AS deps
 RUN apk add --no-cache libc6-compat python3 make g++
 WORKDIR /app
@@ -8,9 +5,6 @@ WORKDIR /app
 COPY package.json package-lock.json* ./
 RUN npm ci
 
-# ============================================
-# Stage 2: Build
-# ============================================
 FROM node:22-alpine AS builder
 RUN apk add --no-cache libc6-compat python3 make g++
 WORKDIR /app
@@ -24,9 +18,6 @@ ENV NODE_ENV production
 RUN npx prisma generate
 RUN npm run build
 
-# ============================================
-# Stage 3: Runtime
-# ============================================
 FROM node:22-alpine AS runner
 RUN apk add --no-cache dumb-init curl font-noto-cjk
 
@@ -43,6 +34,7 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma
 COPY --from=builder --chown=nextjs:nodejs /app/src/generated ./src/generated
+COPY --from=deps --chown=nextjs:nodejs /app/node_modules ./node_modules
 
 USER nextjs
 

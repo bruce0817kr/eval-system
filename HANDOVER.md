@@ -1,8 +1,8 @@
 # 인수인계서 (Handover Document)
 
 **프로젝트**: 중소기업 지원사업 선정평가 시스템  
-**버전**: 1.0  
-**작성일**: 2026-04-02  
+**버전**: 1.1  
+**작성일**: 2026-04-03  
 **작성자**: AI Engineering Team
 
 ---
@@ -62,6 +62,13 @@ C:\Project\eval\
 │       └── storage.ts          # S3/MinIO 업로드
 ├── prisma/
 │   └── schema.prisma           # Prisma 스키마 (17개 모델)
+├── config/
+│   └── postgres.conf          # PostgreSQL WAL 설정
+├── scripts/
+│   ├── backup.sh               # Docker 컨테이너용 백업
+│   ├── host-backup.sh          # 호스트 머신용 백업
+│   ├── restore.sh             # 복구 스크립트
+│   └── crontab.example        # Cron 스케줄 예시
 ├── public/fonts/               # PDF 한글 폰트
 ├── docker-compose.yml          # 개발 환경
 ├── docker-compose.prod.yml     # 운영 환경
@@ -71,7 +78,7 @@ C:\Project\eval\
 
 ---
 
-## 4. 데이터베이스 모델 (17개)
+## 4. 데이터베이스 모델 (18개)
 
 | 모델 | 설명 |
 |------|------|
@@ -81,6 +88,7 @@ C:\Project\eval\
 | EvaluationSession | 평가 회차 |
 | SessionFormDefinition | 평가표 스냅샷 |
 | Application | 기업 신청 정보 |
+| ApplicationDocument | 기업 신청 서류 (PDF) |
 | EvaluationDraft | 평가 초안 (자동저장) |
 | EvaluationSubmission | 평가 제출 |
 | SignatureArtifact | 서명 데이터 |
@@ -91,6 +99,8 @@ C:\Project\eval\
 | AuditEvent | 감사 로그 |
 | AdminAuditLog | 관리자 작업 로그 |
 | CommitteeMemberAuditLog | 평가위원 작업 로그 |
+| FormTemplate | 평가표 템플릿 |
+| FormTemplateVersion | 템플릿 버전 |
 
 ---
 
@@ -164,9 +174,18 @@ npm start
 
 ---
 
-## 8. 주요 수정 이력 (2026-04-02)
+## 8. 주요 수정 이력
 
-### 코드 리뷰 후 수정 사항
+### 2026-04-03 업데이트
+
+| # | 이슈 | 수정 파일 |
+|---|------|----------|
+| 1 | DB 백업 시스템 (WAL 아카이빙) | `config/postgres.conf`, `docker-compose.prod.yml` |
+| 2 | PDF 문서 업로드 API | `api/admin/sessions/[sessionId]/applications/[applicationId]/documents/route.ts` |
+| 3 | 호스트 머신 백업 스크립트 | `scripts/host-backup.sh`, `scripts/restore.sh` |
+| 4 | PostgreSQL WAL 권한 수정 | `wal_archive` 볼륨 postgres:postgres 권한 |
+
+### 2026-04-02 코드 리뷰 후 수정 사항
 
 | # | 이슈 | 수정 파일 |
 |---|------|----------|
@@ -226,7 +245,133 @@ feature/* ← 기능 개발
 
 ---
 
-## 12. 연락처
+## 13. DB 백업 시스템 (WAL 아카이빙)
+
+### 13.1 개요
+PostgreSQL WAL (Write-Ahead Logging) 기반 증분 백업 시스템.
+
+### 13.2 백업 방식
+| 유형 | 주기 | 설명 |
+|------|------|------|
+| Base Backup | 매일 02:00 | pg_basebackup 전체 백업 |
+| WAL 아카이브 | 매 60초 | 변경분 실시간 아카이브 |
+| 보존 | 7일 | 이전 백업 자동 정리 |
+
+### 13.3 생성된 파일
+| 파일 | 용도 |
+|------|------|
+| `config/postgres.conf` | PostgreSQL WAL 설정 |
+| `scripts/backup.sh` | Docker 컨테이너용 백업 스크립트 |
+| `scripts/host-backup.sh` | 호스트 머신용 백업 스크립트 |
+| `scripts/restore.sh` | 복구 스크립트 |
+| `scripts/crontab.example` | Cron 스케줄 설정 예시 |
+
+### 13.4 PostgreSQL 설정
+```bash
+wal_level = replica
+archive_mode = on
+archive_command = 'cp %p /wal_archive/%f'
+archive_timeout = 60
+```
+
+### 13.5 사용법
+```bash
+# 환경변수 설정
+export S3_ACCESS_KEY=your_key
+export S3_SECRET_KEY=your_secret
+export PGPASSWORD=your_password
+
+# 전체 백업 실행 (base + WAL + cleanup)
+./scripts/host-backup.sh full
+
+# WAL만 업로드
+./scripts/host-backup.sh wal
+
+# 오래된 백업 정리
+./scripts/host-backup.sh cleanup
+
+# 복구 가능한 백업 목록
+./scripts/restore.sh list
+
+# 특정 시점으로 복구
+./scripts/restore.sh restore base-20260403-120000
+```
+
+### 13.6 MinIO 버킷 구조
+```
+eval-backups/
+├── base/           # Base backup 저장
+│   └── base-20260403-120000/
+│       ├── backup_timestamp.txt
+│       ├── backup_name.txt
+│       └── pgdata/
+└── wal/            # WAL 파일 아카이브
+    └── 000000010000000000000001
+```
+
+---
+
+## 14. PDF 문서 업로드 API
+
+### 14.1 엔드포인트
+```
+POST   /api/admin/sessions/[sessionId]/applications/[applicationId]/documents
+GET    /api/admin/sessions/[sessionId]/applications/[applicationId]/documents
+DELETE /api/admin/sessions/[sessionId]/applications/[applicationId]/documents/[documentId]
+```
+
+### 14.2 제한사항
+- 파일 형식: PDF만
+- 최대 크기: 50MB
+
+### 14.3 저장소
+- MinIO 버킷: `eval-documents`
+
+---
+
+## 15. Docker 환경 구성 (2026-04-03 수정)
+
+### 15.1 서비스 목록
+| 서비스 | 포트 | 설명 |
+|--------|------|------|
+| app | 3003:3000 | Next.js 애플리케이션 |
+| postgres | 5433:5432 | PostgreSQL 16 + WAL |
+| redis | 6380:6379 | Redis 7 |
+| minio | 9002:9000, 9003:9001 | MinIO S3 |
+
+### 15.2 볼륨
+| 볼륨 | 용도 |
+|------|------|
+| postgres_data | PostgreSQL 데이터 |
+| redis_data | Redis 데이터 |
+| minio_data | MinIO 데이터 |
+| wal_archive | WAL 아카이브 (공유) |
+
+### 15.3 헬스체크
+```bash
+# 전체 서비스 상태
+docker compose -f docker-compose.prod.yml ps
+
+# PostgreSQL 확인
+docker exec eval-postgres-1 psql -U eval -d eval_db -c "SELECT 1;"
+
+# MinIO 버킷 목록
+docker exec eval-minio-1 mc ls minio/
+```
+
+---
+
+## 16. 향후 개선사항
+
+1. **실시간 WebSocket 통신** - 평가 진행 상황 실시간 업데이트
+2. **관리자 템플릿 할당 UI** - 세션 설정에서 평가표 템플릿 선택 UI
+3. **SMS OTP 연동** - CoolSMS/NHN Cloud 실제 연동
+4. **이메일 알림** - 평가 할당, 완료 알림
+5. **다국어 지원** - i18n 프레임워크 적용
+
+---
+
+## 17. 연락처
 
 | 역할 | 담당 |
 |------|------|
