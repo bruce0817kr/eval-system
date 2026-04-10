@@ -1,29 +1,56 @@
-# 인수인계서 - E2E 테스트 인프라 구축
+# 인수인계서 - QA 이슈 수정 및 기능 구현
 
-**작성일**: 2026-04-03  
-**작성자**: Sisyphus AI Agent  
+**최초 작성**: 2026-04-03  
+**최종 업데이트**: 2026-04-10  
 **다음 작업자**: 개발팀
 
 ---
 
-## 1. 완료된 작업
+## 1. 완료된 작업 (2026-04-10 기준)
 
-### 1.1 미해결 문제 해결
+### 1.1 보안
 
-| 문제 | 원인 | 해결책 |
-|------|------|--------|
-| OTP Redis 타임아웃 | `otp.ts`의 `generateOtp()`가 dash 포함 키 저장, `storeOtpForOctomo()`는 dash 없음 | `normalizePhone()` 함수로 키 정규화统一 |
-| PDF 문서 미생성 | DB 레코드 누락 | `scripts/add-test-docs.sql`로 10개(app001~app010) 레코드 추가 |
+| 항목 | 내용 |
+|------|------|
+| 로그인 rate limiting | IP당 10회/15분 초과 시 429, Redis 기반 (`src/lib/auth/rate-limit.ts`) |
+| register bootstrap | admin 없으면 최초 생성 허용, 있으면 admin 세션 필요 |
+| 비밀번호 최소 길이 | 6자 → 8자 |
 
-### 1.2 Docker 네트워크 문제 해결
+### 1.2 버그 수정
 
-- **문제**: `eval-redis`가 `bridge` 네트워크에만 있어 `eval-app-1`(eval_default)과 통신 불가
-- **해결**: `docker network connect --alias redis eval_default eval-redis`
+| 파일 | 수정 내용 |
+|------|-----------|
+| `aggregate/route.ts` | 재개방 후 재집계 시 lastReopen 기준 스코프 적용, create→upsert |
+| `results/route.ts` | 결과 순위 정렬 추가, 죽은 분기 제거 |
+| `results-tab-content.tsx` | AlertDialog controlled state (확정 클릭 후 다이얼로그 닫힘), 0나누기 방지 |
+| `status/route.ts` | finalize 시 집계 미실행이면 "집계를 먼저 실행해주세요" 에러 반환 |
 
-### 1.3 서명 API OTP 폴백
+### 1.3 신규 API
 
-- **문제**: 서명 API(`/api/eval/sessions/[sessionId]/sign`)가 로컬 Redis OTP 미사용
-- **해결**: `verifyOtp()` 폴백 추가 (OCTOMO SMS OTP 우선, 실패 시 로컬 Redis)
+| 엔드포인트 | 기능 |
+|-----------|------|
+| `GET /api/admin/me` | 현재 로그인 admin 정보 반환 (JWT에서 추출) |
+| `POST /api/admin/auth/password` | 비밀번호 변경, 성공 시 admin_session 쿠키 삭제 |
+| `GET /api/admin/audit-log` | 감사 로그 목록 (페이지네이션, 필터) |
+| `GET/PATCH/DELETE /api/admin/sessions/[id]/applications/[id]` | 신청 상세/상태변경/삭제 |
+| `GET /api/admin/sessions/[id]/submissions` | 세션 제출 목록 |
+
+### 1.4 신규 페이지/컴포넌트
+
+| 항목 | 설명 |
+|------|------|
+| `/admin/settings` | 비밀번호 변경 폼, 성공 후 1.5초 뒤 `/admin/login` 리다이렉트 |
+| `CompanyCreateDialog` | 기업 등록 다이얼로그 |
+| `CompanyEditDialog` | 기업 수정 다이얼로그 |
+| `CommitteeAssignDialog` | 평가위원 배정 다이얼로그 (검색/선택/위원장 지정) |
+| `DocumentDialog` | 서류 관리 (업로드/다운로드/삭제 AlertDialog) |
+| `ResultsTabContent` | 결과 탭 (집계/확정) |
+| layout.tsx 사이드바 | `/api/admin/me` fetch로 실제 admin 이름/이메일 표시 |
+
+### 1.5 E2E 테스트
+
+- `eval-signature.spec.ts`: 전체 UI 플로우 + 중복 제출 방지 API 검증 2개 구현
+- `helpers.ts`: `clearSubmissions(memberId, sessionId)` DB 클린업 헬퍼 추가
 
 ---
 
@@ -34,105 +61,78 @@
 ```
 tests/
 ├── page-objects.ts          # Playwright POM 정의
-├── helpers.ts                # Redis OTP 유틸리티
-├── eval-login.spec.ts        # 평가위원 OTP 로그인 (2 passed, 2 skipped)
+├── helpers.ts               # Redis OTP + DB 클린업 유틸리티
+├── eval-login.spec.ts       # 평가위원 OTP 로그인 (2 passed, 2 skipped)
 ├── eval-evaluation.spec.ts  # 평가 플로우 (3 passed)
-├── eval-signature.spec.ts    # 서명 제출 (2 passed)
-└── eval-admin.spec.ts        # 관리자 기능 (6 passed)
+├── eval-signature.spec.ts   # 서명 제출 + 중복방지 (2 passed)
+└── eval-admin.spec.ts       # 관리자 기능 (6 passed)
 ```
 
 ### 2.2 테스트 데이터
 
 | 구분 | 값 |
 |------|-----|
-| 테스트 평가위원 | 김평가 (010-1111-1111) |
-| 평가 세션 | ses001 |
-| 신청 번호 | app001 ~ app010 |
+| 테스트 평가위원 | 김평가 (`test-member-e2e`, phone: 01011111111) |
+| 평가 세션 | `test-session-e2e` (ses001) |
+| 신청 번호 | `app-test-session-e2e` (app001~app010) |
 | 관리자 계정 | testadmin@test.com / TestAdmin123! |
-| Redis OTP | docker exec eval-redis redis-cli FLUSHALL |
+| auditor 계정 | auditor@test.com / Auditor123! |
 
-### 2.3 테스트 실행 방법
+### 2.3 테스트 실행
 
 ```bash
-# Redis OTP 클리어
-docker exec eval-redis redis-cli FLUSHALL
-
-# 전체 E2E 테스트 실행 (단일 워커)
+# 전체 실행
 npx playwright test --workers=1 --timeout=60000
 
-# 특정 테스트만 실행
+# 특정 파일만
 npx playwright test tests/eval-admin.spec.ts --workers=1
-```
 
-### 2.4 테스트 결과
-
-```
-✅ eval-admin.spec.ts: 6 passed
-✅ eval-evaluation.spec.ts: 3 passed
-✅ eval-login.spec.ts: 2 passed, 2 skipped (OCTOMO API 의존)
-✅ eval-signature.spec.ts: 2 passed
-─────────────────────────────────
-Total: 11 passed, 4 skipped
+# Redis OTP 클리어 (필요 시)
+docker exec eval-redis-1 redis-cli FLUSHALL
 ```
 
 ---
 
-## 3. 수정된 파일
+## 3. Docker 운영
 
-### 3.1 src/lib/auth/otp.ts
+```bash
+# 앱 재빌드 후 재시작
+docker compose -f docker-compose.prod.yml build app
+docker compose -f docker-compose.prod.yml up -d --no-deps app
 
-- `normalizePhone()` 함수 추가 (dash 포함/미포함 phone 정규화)
-- `generateOtp()` 및 관련 함수에서 `normalizePhone()` 사용
+# Redis 별도 시작 (--no-deps 사용 시 redis가 내려가므로 반드시 실행)
+docker compose -f docker-compose.prod.yml up -d redis
 
-### 3.2 src/app/api/eval/sessions/[sessionId]/sign/route.ts
+# 컨테이너 상태 확인
+docker ps --filter "name=eval"
+```
 
-- `verifyOtp()` 폴백 추가 (OCTOMO → 로컬 Redis 순서)
+> **주의**: `--no-deps` 없이 prod compose `up -d` 실행 시 eval-postgres 삭제됨.
+> postgres가 꺼지면: `docker compose up -d postgres` (메인 compose로 복구)
 
 ---
 
-## 4. 알려진 이슈 및 제한사항
+## 4. 알려진 이슈
 
-### 4.1 관리자 로그인 테스트
+### 4.1 관리자 로그인 Playwright 테스트
 
-- **이슈**: react-hook-form의 controlled input이 Playwright 폼 입력 인식 불가
-- **현재 해결책**: API 직접 호출方式来 인증 (테스트 내에서 `adminLogin()` 헬퍼 사용)
-- **영향**: 관리자 로그인 테스트만 API 기반, 실제 브라우저 UX는 문제없음
+- react-hook-form controlled input이 Playwright `fill` 인식 불가
+- 해결: API 직접 호출로 인증 (`adminLogin()` 헬퍼)
 
 ### 4.2 스킵된 테스트
 
-- `eval-login.spec.ts`의 2개 테스트: OCTOMO API OTP 검증 스킵
+- `eval-login.spec.ts` 2개: OCTOMO API OTP 검증 의존
 - 실제 운영에서는 OCTOMO SMS OTP 수신 필요
 
 ---
 
-## 5. 다음 작업 권장사항
-
-1. **중복 제출 방지 E2E 테스트 개션**: 현재 2개 테스트 존재, 세션 상태 충돌로 스킵됨
-2. **초안 저장 E2E 테스트**: 재접속 시 데이터 유지 검증
-3. **OCTOMO OTP 실제 수신**: 테스트 환경에서 실제 SMS OTP 수신 가능 시 스킵된 테스트 활성화
-
----
-
-## 6. Docker 컨테이너 상태
-
-```bash
-# 실행 중인 eval 관련 컨테이너
-eval-redis       # OTP Redis (포트 6380)
-eval-postgres    # PostgreSQL (eval_db)
-eval-minio       # S3 호환 스토리지
-eval-app-1       # Next.js 애플리케이션 (포트 3003)
-
-# Redis 네트워크 연결 확인
-docker network connect --alias redis eval_default eval-redis
-```
-
----
-
-## 7. 환경 변수 (관련)
+## 5. 환경 변수
 
 ```
 DATABASE_URL=postgresql://eval:eval_secret@postgres:5432/eval_db
-REDIS_URL=redis://localhost:6380
+REDIS_URL=redis://redis:6379   # Docker 내부 (prod compose 기준)
 AUTH_SECRET=change-this-to-a-random-secret-in-production
-OCTOMO_API_KEY=5094845958e294fa3f33c03f2b594a2485f99483738f4f1e9d7503621ee4eceb
+OCTOMO_API_KEY=...
 ```
+</content>
+</invoke>
