@@ -64,10 +64,14 @@ function getBadgeStyle(status: SessionStatus) {
   return { variant: "default" as const, className: "" }
 }
 
+const PAGE_SIZE = 10
+
 export default function AdminSessionsPage() {
   const router = useRouter()
   const [searchInput, setSearchInput] = useState("")
   const [search, setSearch] = useState("")
+  const [page, setPage] = useState(1)
+  const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [sessions, setSessions] = useState<SessionListItem[]>([])
@@ -75,6 +79,7 @@ export default function AdminSessionsPage() {
   useEffect(() => {
     const timer = window.setTimeout(() => {
       setSearch(searchInput.trim())
+      setPage(1)
     }, 250)
 
     return () => window.clearTimeout(timer)
@@ -86,8 +91,8 @@ export default function AdminSessionsPage() {
 
     try {
       const params = new URLSearchParams()
-      params.set("page", "1")
-      params.set("pageSize", "100")
+      params.set("page", String(page))
+      params.set("pageSize", String(PAGE_SIZE))
 
       if (search) {
         params.set("search", search)
@@ -105,14 +110,16 @@ export default function AdminSessionsPage() {
 
       const result = (await response.json()) as {
         sessions: SessionListItem[]
+        total: number
       }
       setSessions(result.sessions)
+      setTotal(result.total)
     } catch {
       setError("회차 목록을 불러오는 중 네트워크 오류가 발생했습니다")
     } finally {
       setLoading(false)
     }
-  }, [search])
+  }, [search, page])
 
   useEffect(() => {
     void fetchSessions()
@@ -249,38 +256,51 @@ export default function AdminSessionsPage() {
           </CardContent>
         </Card>
       ) : (
-        <div className="rounded-lg border">
-          <Table>
-            <TableHeader>
-              {table.getHeaderGroups().map((headerGroup) => (
-                <TableRow key={headerGroup.id}>
-                  {headerGroup.headers.map((header) => (
-                    <TableHead key={header.id}>
-                      {header.isPlaceholder
-                        ? null
-                        : flexRender(header.column.columnDef.header, header.getContext())}
-                    </TableHead>
-                  ))}
-                </TableRow>
-              ))}
-            </TableHeader>
-            <TableBody>
-              {table.getRowModel().rows.map((row) => (
-                <TableRow
-                  key={row.id}
-                  className="cursor-pointer"
-                  onClick={() => router.push(`/admin/sessions/${row.original.id}`)}
-                >
-                  {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id}>
-                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                    </TableCell>
-                  ))}
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
+        <>
+          <div className="rounded-lg border">
+            <Table>
+              <TableHeader>
+                {table.getHeaderGroups().map((headerGroup) => (
+                  <TableRow key={headerGroup.id}>
+                    {headerGroup.headers.map((header) => (
+                      <TableHead key={header.id}>
+                        {header.isPlaceholder
+                          ? null
+                          : flexRender(header.column.columnDef.header, header.getContext())}
+                      </TableHead>
+                    ))}
+                  </TableRow>
+                ))}
+              </TableHeader>
+              <TableBody>
+                {table.getRowModel().rows.map((row) => (
+                  <TableRow
+                    key={row.id}
+                    className="cursor-pointer"
+                    onClick={() => router.push(`/admin/sessions/${row.original.id}`)}
+                  >
+                    {row.getVisibleCells().map((cell) => (
+                      <TableCell key={cell.id}>
+                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+
+          {total > PAGE_SIZE && (
+            <div className="flex items-center justify-between">
+              <p className="text-sm text-muted-foreground">총 {total}건</p>
+              <div className="flex items-center gap-2">
+                <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>이전</Button>
+                <span className="text-sm text-muted-foreground">{page} / {Math.ceil(total / PAGE_SIZE)}</span>
+                <Button variant="outline" size="sm" disabled={page >= Math.ceil(total / PAGE_SIZE)} onClick={() => setPage((p) => p + 1)}>다음</Button>
+              </div>
+            </div>
+          )}
+        </>
       )}
     </div>
   )

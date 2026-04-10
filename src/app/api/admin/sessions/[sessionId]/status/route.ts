@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server'
-import { ApplicationStatus, type Prisma, type SessionStatus } from '@/generated/prisma/client'
+import { ApplicationStatus, type Prisma } from '@/generated/prisma/client'
 import { z } from 'zod'
 
-import { verifySession } from '@/lib/auth/jwt'
+import { getAdminSession } from '@/lib/auth/jwt'
 import { prisma } from '@/lib/db'
 import { canTransition, type EvaluationSessionStatus } from '@/lib/session'
 
@@ -15,28 +15,11 @@ function unauthorized() {
   return NextResponse.json({ error: '인증이 필요합니다' }, { status: 401 })
 }
 
-function average(values: number[]) {
-  if (values.length === 0) {
-    return 0
-  }
-
-  return values.reduce((sum, value) => sum + value, 0) / values.length
-}
-
-function trimScores(rawScores: number[], trimRule: string) {
-  if (trimRule === 'exclude_min_max' && rawScores.length > 2) {
-    const sorted = [...rawScores].sort((a, b) => a - b)
-    return sorted.slice(1, sorted.length - 1)
-  }
-
-  return rawScores
-}
-
 export async function POST(
   request: Request,
   context: { params: Promise<{ sessionId: string }> },
 ) {
-  const adminSession = await verifySession('admin_session', request)
+  const adminSession = await getAdminSession(request)
 
   if (!adminSession) {
     return unauthorized()
@@ -181,7 +164,7 @@ export async function POST(
             applicationsCount,
             successCount: 0,
             errorCount: 0,
-            computedById: adminSession.sub,
+            computedById: adminSession.id,
           },
         })
 
@@ -195,106 +178,39 @@ export async function POST(
         })
       }
 
-      const applications = await tx.application.findMany({
-        where: {
-          sessionId: session.id,
-          status: {
-            not: ApplicationStatus.excluded,
-          },
-        },
-        orderBy: [{ evaluationOrder: 'asc' }, { createdAt: 'asc' }],
-        select: {
-          id: true,
-          evaluationOrder: true,
-        },
+      // finalize: 기존 ResultSnapshot을 그대로 사용 (재계산 없음)
+      const existingSnapshots = await tx.resultSnapshot.findMany({
+        where: { sessionId: session.id },
+        select: { applicationId: true, rank: true, finalScore: true },
       })
 
-      const snapshotsInput = await Promise.all(
-        applications.map(async (application) => {
-          const submissions = await tx.evaluationSubmission.findMany({
-            where: {
-              sessionId: session.id,
-              applicationId: application.id,
-              isValid: true,
-              totalScore: {
-                not: null,
-              },
-            },
-            select: {
-              id: true,
-              totalScore: true,
-            },
-          })
-
-          const rawScores = submissions
-            .map((submission) => submission.totalScore)
-            .filter((value): value is number => typeof value === 'number')
-
-          const trimmedScores = trimScores(rawScores, session.trimRule)
-          const finalScore = average(trimmedScores.length > 0 ? trimmedScores : rawScores)
-
-          return {
-            applicationId: application.id,
-            evaluationOrder: application.evaluationOrder,
-            rawScores,
-            trimmedScores,
-            finalScore,
-          }
-        }),
-      )
-
-      const ranked = [...snapshotsInput].sort((a, b) => {
-        if (b.finalScore === a.finalScore) {
-          return a.evaluationOrder - b.evaluationOrder
-        }
-
-        return b.finalScore - a.finalScore
-      })
+      if (existingSnapshots.length === 0) {
+        throw new Error('집계를 먼저 실행해주세요')
+      }
 
       const finalizedAt = new Date()
 
-      for (const [index, item] of ranked.entries()) {
-        await tx.resultSnapshot.upsert({
-          where: {
-            applicationId: item.applicationId,
-          },
-          create: {
-            sessionId: session.id,
-            applicationId: item.applicationId,
-            rawScoresJson: item.rawScores as Prisma.InputJsonValue,
-            trimmedScoresJson: item.trimmedScores as Prisma.InputJsonValue,
-            finalScore: item.finalScore,
-            rank: index + 1,
-            computedById: adminSession.sub,
-            finalizedAt,
-          },
-          update: {
-            rawScoresJson: item.rawScores as Prisma.InputJsonValue,
-            trimmedScoresJson: item.trimmedScores as Prisma.InputJsonValue,
-            finalScore: item.finalScore,
-            rank: index + 1,
-            computedById: adminSession.sub,
-            finalizedAt,
-          },
-        })
-      }
+      await tx.resultSnapshot.updateMany({
+        where: { sessionId: session.id },
+        data: { finalizedAt },
+      })
 
       await tx.aggregationRun.create({
         data: {
           sessionId: session.id,
-          triggerType: 'manual',
+          triggerType: 'finalize',
           triggerReason: reason || null,
-          applicationsCount: ranked.length,
-          successCount: ranked.length,
+          applicationsCount: existingSnapshots.length,
+          successCount: existingSnapshots.length,
           errorCount: 0,
           resultJson: {
-            rankings: ranked.map((item, index) => ({
-              applicationId: item.applicationId,
-              rank: index + 1,
-              finalScore: item.finalScore,
+            rankings: existingSnapshots.map((s) => ({
+              applicationId: s.applicationId,
+              rank: s.rank,
+              finalScore: s.finalScore,
             })),
           },
-          computedById: adminSession.sub,
+          computedById: adminSession.id,
         },
       })
 
@@ -306,6 +222,30 @@ export async function POST(
         },
       })
     })
+
+    const auditAction =
+      targetStatus === 'finalized' ? 'finalize' :
+      targetStatus === 'reopened' ? 'reopen' : 'update'
+
+    try {
+      await prisma.auditEvent.create({
+        data: {
+          actorType: 'admin',
+          actorId: adminSession.id,
+          action: auditAction,
+          targetType: 'EvaluationSession',
+          targetId: sessionId,
+          sessionId,
+          ipAddress:
+            request.headers.get('x-forwarded-for') ??
+            request.headers.get('x-real-ip') ??
+            null,
+          payloadJson: { targetStatus, reason: reason ?? null },
+        },
+      })
+    } catch (e) {
+      console.error('Audit log failed:', e)
+    }
 
     return NextResponse.json(updated, { status: 200 })
   } catch (error) {

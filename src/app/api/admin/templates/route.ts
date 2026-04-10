@@ -15,6 +15,8 @@ const listQuerySchema = z.object({
     .enum(['true', 'false'])
     .transform((value) => value === 'true')
     .optional(),
+  page: z.coerce.number().int().min(1).default(1),
+  pageSize: z.coerce.number().int().min(1).max(100).default(10),
 })
 
 const createTemplateSchema = z.object({
@@ -39,6 +41,8 @@ export async function GET(request: Request) {
   const parsed = listQuerySchema.safeParse({
     search: url.searchParams.get('search') ?? undefined,
     isShared: url.searchParams.get('isShared') ?? undefined,
+    page: url.searchParams.get('page') ?? undefined,
+    pageSize: url.searchParams.get('pageSize') ?? undefined,
   })
 
   if (!parsed.success) {
@@ -48,7 +52,7 @@ export async function GET(request: Request) {
     )
   }
 
-  const { search, isShared } = parsed.data
+  const { search, isShared, page, pageSize } = parsed.data
   const where: Prisma.FormTemplateWhereInput = {
     ...(typeof isShared === 'boolean' ? { isShared } : {}),
     ...(search
@@ -61,16 +65,21 @@ export async function GET(request: Request) {
       : {}),
   }
 
-  const templates = await prisma.formTemplate.findMany({
-    where,
-    orderBy: { createdAt: 'desc' },
-    include: {
-      versions: {
-        orderBy: { versionNumber: 'desc' },
-        take: 1,
+  const [templates, total] = await Promise.all([
+    prisma.formTemplate.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+      skip: (page - 1) * pageSize,
+      take: pageSize,
+      include: {
+        versions: {
+          orderBy: { versionNumber: 'desc' },
+          take: 1,
+        },
       },
-    },
-  })
+    }),
+    prisma.formTemplate.count({ where }),
+  ])
 
   return NextResponse.json(
     {
@@ -82,6 +91,7 @@ export async function GET(request: Request) {
         createdAt: template.createdAt,
         latestVersion: template.versions[0] ?? null,
       })),
+      total,
     },
     { status: 200 },
   )

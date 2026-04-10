@@ -1,14 +1,14 @@
 import { NextResponse } from 'next/server'
-import type { NextRequest } from 'next/server'
+import { getAdminSession } from '@/lib/auth/jwt'
 import { prisma } from '@/lib/db'
 
-export async function GET(request: NextRequest) {
+export async function GET(request: Request) {
+  const admin = await getAdminSession(request)
+  if (!admin) {
+    return NextResponse.json({ error: '인증이 필요합니다' }, { status: 401 })
+  }
+
   try {
-    const token = request.cookies.get('admin_session')?.value
-    
-    if (!token) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
 
     const [
       totalSessions,

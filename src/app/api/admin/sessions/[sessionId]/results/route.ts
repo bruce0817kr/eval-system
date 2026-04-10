@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { getAdminSession } from '@/lib/auth/jwt'
-import { EvaluationSession } from '@/generated/prisma/client'
 
 export async function GET(
   request: NextRequest,
@@ -16,18 +15,19 @@ export async function GET(
 
     const evalSession = await prisma.evaluationSession.findUnique({
       where: { id: resolvedParams.sessionId },
-      include: {
+      select: {
+        title: true,
+        status: true,
         applications: {
           include: {
-            company: true,
+            company: { select: { name: true } },
             resultSnapshots: {
-              orderBy: {
-                rank: 'asc'
-              }
-            }
-          }
-        }
-      }
+              orderBy: { rank: 'asc' },
+              take: 1,
+            },
+          },
+        },
+      },
     })
 
     if (!evalSession) {
@@ -37,40 +37,34 @@ export async function GET(
     const results = evalSession.applications.map(app => {
       const snapshot = app.resultSnapshots[0]
       return {
-        순위: snapshot?.rank || null,
-        기업명: app.company.name,
-        사업자번호: app.company.businessNumber || '',
-        대표자명: app.company.ceoName || '',
-        최종점수: snapshot?.finalScore || null,
-        신청순서: app.evaluationOrder,
-        상태: app.status
+        applicationId: app.id,
+        companyName: app.company.name,
+        rank: snapshot?.rank ?? null,
+        finalScore: snapshot?.finalScore ?? null,
+        status: app.status,
       }
     })
 
-    const { searchParams } = new URL(request.url)
-    const format = searchParams.get('format') || 'excel'
+    // 순위 기준으로 정렬, 미집계는 하단
+    results.sort((a, b) => {
+      if (a.rank === null && b.rank === null) return 0
+      if (a.rank === null) return 1
+      if (b.rank === null) return -1
+      return a.rank - b.rank
+    })
 
-    if (format === 'pdf') {
-      return NextResponse.json({
-        message: 'PDF generation endpoint - implement with pdfkit/puppeteer in production',
-        data: results
-      })
-    } else {
-      return NextResponse.json({
-        success: true,
-        sessionId: resolvedParams.sessionId,
-        sessionTitle: evalSession.title,
-        generatedAt: new Date().toISOString(),
-        results: results,
-        totalApplications: evalSession.applications.length,
-        evaluatedApplications: results.filter(r => r.최종점수 !== null).length
-      })
-    }
+    return NextResponse.json({
+      success: true,
+      sessionId: resolvedParams.sessionId,
+      sessionTitle: evalSession.title,
+      sessionStatus: evalSession.status,
+      generatedAt: new Date().toISOString(),
+      results,
+      totalApplications: evalSession.applications.length,
+      evaluatedApplications: results.filter(r => r.finalScore !== null).length,
+    })
   } catch (error) {
-    console.error('Results export error:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
+    console.error('Results fetch error:', error)
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

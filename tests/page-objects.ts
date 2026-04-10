@@ -117,4 +117,4 @@ export const test = base.extend<{
   },
 })
 
-export { getOTPFromRedis, waitForOTP, clearRedisOTP } from './helpers'
+export { getOTPFromRedis, waitForOTP, clearRedisOTP, clearSubmissions } from './helpers'

@@ -69,3 +69,14 @@ export async function clearRedisOTP(phone: string): Promise<void> {
     // Empty catch - cleanup failures are non-critical
   }
 }
+
+export function clearSubmissions(memberId: string, sessionId: string): void {
+  try {
+    execSync(
+      `docker exec eval-postgres-1 psql -U eval -d eval_db -c "DELETE FROM evaluation_submission WHERE committee_member_id = '${memberId}' AND session_id = '${sessionId}'"`,
+      { encoding: 'utf8' },
+    )
+  } catch {
+    // cleanup failures are non-critical
+  }
+}

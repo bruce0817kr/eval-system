@@ -128,5 +128,25 @@ export async function POST(request: Request, context: SessionCommitteeContext) {
     orderBy: [{ role: 'asc' }, { assignedAt: 'asc' }],
   })
 
+  try {
+    await prisma.auditEvent.create({
+      data: {
+        actorType: 'admin',
+        actorId: adminSession.id,
+        action: 'create',
+        targetType: 'SessionCommitteeAssignment',
+        targetId: sessionId,
+        sessionId,
+        ipAddress:
+          request.headers.get('x-forwarded-for') ??
+          request.headers.get('x-real-ip') ??
+          null,
+        payloadJson: { memberIds: parsed.data.memberIds, chairId: parsed.data.chairId ?? null },
+      },
+    })
+  } catch (e) {
+    console.error('Audit log failed:', e)
+  }
+
   return NextResponse.json({ assignments }, { status: 200 })
 }

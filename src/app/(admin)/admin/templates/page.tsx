@@ -52,11 +52,15 @@ type TemplateRow = {
   } | null
 }
 
+const PAGE_SIZE = 10
+
 export default function AdminTemplatesPage() {
   const router = useRouter()
   const [templates, setTemplates] = React.useState<TemplateRow[]>([])
   const [search, setSearch] = React.useState('')
   const [sharedFilter, setSharedFilter] = React.useState<'all' | 'true' | 'false'>('all')
+  const [page, setPage] = React.useState(1)
+  const [total, setTotal] = React.useState(0)
   const [isLoading, setIsLoading] = React.useState(true)
   const [isCreateOpen, setIsCreateOpen] = React.useState(false)
   const [error, setError] = React.useState<string | null>(null)
@@ -67,6 +71,8 @@ export default function AdminTemplatesPage() {
 
     try {
       const params = new URLSearchParams()
+      params.set('page', String(page))
+      params.set('pageSize', String(PAGE_SIZE))
 
       if (search.trim()) {
         params.set('search', search.trim())
@@ -84,18 +90,23 @@ export default function AdminTemplatesPage() {
         return
       }
 
-      const payload = (await response.json()) as { templates: TemplateRow[] }
+      const payload = (await response.json()) as { templates: TemplateRow[]; total: number }
       setTemplates(payload.templates)
+      setTotal(payload.total)
     } catch {
       setError('템플릿 목록을 불러오지 못했습니다')
     } finally {
       setIsLoading(false)
     }
-  }, [search, sharedFilter])
+  }, [search, sharedFilter, page])
 
   React.useEffect(() => {
     void fetchTemplates()
   }, [fetchTemplates])
+
+  React.useEffect(() => {
+    setPage(1)
+  }, [search, sharedFilter])
 
   async function handleDelete(templateId: string) {
     const response = await fetch(`/api/admin/templates/${templateId}`, {
@@ -224,6 +235,17 @@ export default function AdminTemplatesPage() {
               </CardContent>
             </Card>
           ) : null}
+
+          {total > PAGE_SIZE && (
+            <div className="flex items-center justify-between">
+              <p className="text-sm text-muted-foreground">총 {total}건</p>
+              <div className="flex items-center gap-2">
+                <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>이전</Button>
+                <span className="text-sm text-muted-foreground">{page} / {Math.ceil(total / PAGE_SIZE)}</span>
+                <Button variant="outline" size="sm" disabled={page >= Math.ceil(total / PAGE_SIZE)} onClick={() => setPage((p) => p + 1)}>다음</Button>
+              </div>
+            </div>
+          )}
 
           {templates.length > 0 ? (
             <Table>

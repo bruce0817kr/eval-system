@@ -57,7 +57,7 @@ export default function AdminSessionAggregationsPage() {
     }[]
   >([]);
 
-  const fetchAggregations = useEffect(() => {
+  const fetchAggregations = () => {
     if (!sessionId) return;
 
     setLoading(true);
@@ -80,6 +80,10 @@ export default function AdminSessionAggregationsPage() {
         setError(err.message);
         setLoading(false);
       });
+  };
+
+  useEffect(() => {
+    fetchAggregations();
   }, [sessionId]);
 
   const getTriggerTypeLabel = (type: string) => {
@@ -115,9 +119,7 @@ export default function AdminSessionAggregationsPage() {
         <CardContent>
           <Button
             variant="outline"
-            onClick={() => {
-              window.location.reload();
-            }}
+            onClick={() => fetchAggregations()}
           >
             <RefreshCcwIcon className="size-4" />
             새로고침
@@ -170,7 +172,6 @@ export default function AdminSessionAggregationsPage() {
                   <TableHead>성공</TableHead>
                   <TableHead>실패</TableHead>
                   <TableHead>실행자</TableHead>
-                  <TableHead>상세</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -212,14 +213,6 @@ export default function AdminSessionAggregationsPage() {
                       ) : (
                         <span className="text-muted-foreground">시스템</span>
                       )}
-                    </TableCell>
-                    <TableCell>
-                      <Link
-                        href={`/admin/sessions/${sessionId}/aggregations/${agg.id}`}
-                        className="text-sm font-medium text-primary hover:underline"
-                      >
-                        상세 보기
-                      </Link>
                     </TableCell>
                   </TableRow>
                 ))}

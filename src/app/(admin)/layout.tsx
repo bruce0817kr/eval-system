@@ -1,6 +1,7 @@
 "use client"
 
 import Link from "next/link"
+import { useEffect, useState } from "react"
 import { usePathname, useRouter } from "next/navigation"
 import {
   Building2,
@@ -8,6 +9,7 @@ import {
   FileText,
   LayoutDashboard,
   LogOut,
+  Settings,
   Shield,
   type LucideIcon,
   Users,
@@ -68,7 +70,14 @@ const adminNavItems: AdminNavItem[] = [
     href: "/admin/audit-log",
     icon: Shield,
   },
+  {
+    title: "설정",
+    href: "/admin/settings",
+    icon: Settings,
+  },
 ]
+
+type AdminMe = { name: string; email: string; role: string }
 
 export default function AdminLayout({
   children,
@@ -77,6 +86,15 @@ export default function AdminLayout({
 }) {
   const pathname = usePathname()
   const router = useRouter()
+  const [me, setMe] = useState<AdminMe | null>(null)
+
+  useEffect(() => {
+    fetch('/api/admin/me')
+      .then((r) => r.ok ? r.json() as Promise<AdminMe> : null)
+      .then((data) => { if (data) setMe(data) })
+      .catch(() => {})
+  }, [])
+
   const currentItem =
     adminNavItems.find(
       (item) => pathname === item.href || pathname.startsWith(`${item.href}/`)
@@ -128,12 +146,12 @@ export default function AdminLayout({
         <SidebarFooter className="border-t border-sidebar-border px-2 py-3">
           <div className="flex items-center gap-3 rounded-lg border border-sidebar-border bg-sidebar-accent/20 px-3 py-3 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0">
             <Avatar>
-              <AvatarFallback>관</AvatarFallback>
+              <AvatarFallback>{me?.name?.[0] ?? '관'}</AvatarFallback>
             </Avatar>
             <div className="min-w-0 flex-1 group-data-[collapsible=icon]:hidden">
-              <p className="truncate text-sm font-medium">관리자 계정</p>
+              <p className="truncate text-sm font-medium">{me?.name ?? '관리자'}</p>
               <p className="truncate text-xs text-muted-foreground">
-                admin@example.com
+                {me?.email ?? ''}
               </p>
             </div>
           </div>

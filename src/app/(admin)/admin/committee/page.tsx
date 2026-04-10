@@ -135,6 +135,26 @@ export default function AdminCommitteePage() {
     }
   }
 
+  const handleActivate = async (memberId: string) => {
+    try {
+      const response = await fetch(`/api/admin/committee/${memberId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isActive: true }),
+      })
+
+      if (!response.ok) {
+        const payload = (await response.json()) as { error?: string }
+        setErrorMessage(payload.error ?? '위원 활성화에 실패했습니다')
+        return
+      }
+
+      await fetchMembers()
+    } catch {
+      setErrorMessage('위원 활성화 중 오류가 발생했습니다')
+    }
+  }
+
   const isEmpty = !isLoading && members.length === 0
 
   return (
@@ -265,31 +285,43 @@ export default function AdminCommitteePage() {
                             수정
                           </Button>
 
-                          <AlertDialog>
-                            <AlertDialogTrigger render={<Button type="button" size="sm" variant="destructive" disabled={!member.isActive} />}>
-                              <Trash2 className="size-4" />
-                              비활성화
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>평가위원을 비활성화할까요?</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  활성 회차에 배정되지 않은 경우에만 비활성화할 수 있습니다.
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>취소</AlertDialogCancel>
-                                <AlertDialogAction
-                                  variant="destructive"
-                                  onClick={() => {
-                                    void handleDeactivate(member.id)
-                                  }}
-                                >
-                                  비활성화
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
+                          {member.isActive ? (
+                            <AlertDialog>
+                              <AlertDialogTrigger render={<Button type="button" size="sm" variant="destructive" />}>
+                                <Trash2 className="size-4" />
+                                비활성화
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>평가위원을 비활성화할까요?</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    활성 회차에 배정되지 않은 경우에만 비활성화할 수 있습니다.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>취소</AlertDialogCancel>
+                                  <AlertDialogAction
+                                    variant="destructive"
+                                    onClick={() => {
+                                      void handleDeactivate(member.id)
+                                    }}
+                                  >
+                                    비활성화
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          ) : (
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              onClick={() => void handleActivate(member.id)}
+                            >
+                              <UserCheck className="size-4" />
+                              활성화
+                            </Button>
+                          )}
                         </div>
                       </TableCell>
                     </TableRow>

@@ -36,6 +36,7 @@ type Props = {
 export function CompanySearchDialog({ open, onOpenChange, onSelectCompany }: Props) {
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const [results, setResults] = useState<Company[]>([])
   const [showCreateForm, setShowCreateForm] = useState(false)
   const [createForm, setCreateForm] = useState({
@@ -58,6 +59,7 @@ export function CompanySearchDialog({ open, onOpenChange, onSelectCompany }: Pro
 
     async function fetchCompanies() {
       setLoading(true)
+      setError(null)
 
       try {
         const response = await fetch(
@@ -68,11 +70,16 @@ export function CompanySearchDialog({ open, onOpenChange, onSelectCompany }: Pro
         )
 
         if (!response.ok) {
+          setError('기업 목록을 불러오지 못했습니다')
           return
         }
 
         const data = (await response.json()) as CompaniesResponse
         setResults(data.items ?? [])
+      } catch (e) {
+        if (e instanceof Error && e.name !== 'AbortError') {
+          setError('네트워크 오류가 발생했습니다')
+        }
       } finally {
         setLoading(false)
       }
@@ -89,6 +96,7 @@ export function CompanySearchDialog({ open, onOpenChange, onSelectCompany }: Pro
     }
 
     setCreateLoading(true)
+    setError(null)
 
     try {
       const response = await fetch('/api/admin/companies', {
@@ -108,12 +116,16 @@ export function CompanySearchDialog({ open, onOpenChange, onSelectCompany }: Pro
       })
 
       if (!response.ok) {
+        const body = (await response.json()) as { error?: string }
+        setError(body.error ?? '기업 등록에 실패했습니다')
         return
       }
 
       const created = (await response.json()) as Company
       await onSelectCompany(created)
       onOpenChange(false)
+    } catch {
+      setError('기업 등록에 실패했습니다')
     } finally {
       setCreateLoading(false)
     }
@@ -162,6 +174,8 @@ export function CompanySearchDialog({ open, onOpenChange, onSelectCompany }: Pro
             )}
           </div>
         </ScrollArea>
+
+        {error && <p className="text-sm text-destructive">{error}</p>}
 
         {showCreateForm ? (
           <div className="space-y-2 rounded-md border p-3">

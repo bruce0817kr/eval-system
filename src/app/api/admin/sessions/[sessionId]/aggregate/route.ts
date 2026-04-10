@@ -1,13 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { getAdminSession, requireRole } from '@/lib/auth/jwt'
-import { audit } from '@/lib/audit'
-import { EvaluationSession, SessionStatus } from '@/generated/prisma/client'
-import type { FormSchema, FormSection, FormItem } from '@/lib/form-template-schema'
+import type { FormSchema, FormItem } from '@/lib/form-template-schema'
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: Promise<{ sessionId: string; }> }
+  { params }: { params: Promise<{ sessionId: string }> }
 ) {
   try {
     const session = await getAdminSession(request)
@@ -67,23 +65,6 @@ export async function POST(
       return NextResponse.json(
         { error: 'Session must be closed before aggregation' },
         { status: 400 }
-      )
-    }
-
-    const existingAggregation = await prisma.aggregationRun.findFirst({
-      where: {
-        sessionId: resolvedParams.sessionId,
-        successCount: { gt: 0 }
-      },
-      orderBy: {
-        computedAt: 'desc'
-      }
-    })
-
-    if (existingAggregation) {
-      return NextResponse.json(
-        { error: 'Aggregation already exists for this session' },
-        { status: 409 }
       )
     }
 
@@ -187,7 +168,6 @@ export async function POST(
         .filter(r => r.success) as SuccessfulResult[])
         .sort((a, b) => b.finalScore - a.finalScore)
 
-      let rank = 1
       successfulResults.forEach((result, index) => {
         if (index > 0) {
           const prev = successfulResults[index - 1]
@@ -230,9 +210,10 @@ export async function POST(
       }
 
       await prisma.$transaction(async (tx) => {
-        const snapshotCreates = successfulResultsData.map(result =>
-          tx.resultSnapshot.create({
-            data: {
+        const snapshotUpserts = successfulResultsData.map(result =>
+          tx.resultSnapshot.upsert({
+            where: { applicationId: result.applicationId },
+            create: {
               applicationId: result.applicationId,
               sessionId: resolvedParams.sessionId,
               rawScoresJson: result.rawScores as any,
@@ -240,22 +221,50 @@ export async function POST(
               finalScore: result.finalScore,
               rank: result.rank,
               computedAt: new Date(),
-              computedById: session.id
-            }
+              computedById: session.id,
+            },
+            update: {
+              rawScoresJson: result.rawScores as any,
+              trimmedScoresJson: result.trimmedScores as any,
+              finalScore: result.finalScore,
+              rank: result.rank,
+              computedAt: new Date(),
+              computedById: session.id,
+            },
           })
         )
-        
+
         await tx.aggregationRun.update({
           where: { id: aggregationRun.id },
           data: {
             successCount: successfulResultsData.length,
             errorCount: evalSession.applications.length - successfulResultsData.length,
-            resultJson: resultJsonData as any
-          }
+            resultJson: resultJsonData as any,
+          },
         })
-        
-        await Promise.all(snapshotCreates)
+
+        await Promise.all(snapshotUpserts)
       })
+
+      try {
+        await prisma.auditEvent.create({
+          data: {
+            actorType: 'admin',
+            actorId: session.id,
+            action: 'aggregate',
+            targetType: 'EvaluationSession',
+            targetId: resolvedParams.sessionId,
+            sessionId: resolvedParams.sessionId,
+            ipAddress:
+              request.headers.get('x-forwarded-for') ??
+              request.headers.get('x-real-ip') ??
+              null,
+            payloadJson: { aggregationRunId: aggregationRun.id },
+          },
+        })
+      } catch (e) {
+        console.error('Audit log failed:', e)
+      }
 
       return NextResponse.json({
         success: true,

@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { type Prisma } from '@/generated/prisma/client'
 import { z } from 'zod'
 
-import { verifySession } from '@/lib/auth/jwt'
+import { getAdminSession, requireRole } from '@/lib/auth/jwt'
 import { prisma } from '@/lib/db'
 
 const formBodySchema = z.object({
@@ -17,7 +17,7 @@ export async function GET(
   request: Request,
   context: { params: Promise<{ sessionId: string }> },
 ) {
-  const adminSession = await verifySession('admin_session', request)
+  const adminSession = await getAdminSession(request)
 
   if (!adminSession) {
     return unauthorized()
@@ -42,10 +42,14 @@ export async function POST(
   request: Request,
   context: { params: Promise<{ sessionId: string }> },
 ) {
-  const adminSession = await verifySession('admin_session', request)
+  const adminSession = await getAdminSession(request)
 
   if (!adminSession) {
     return unauthorized()
+  }
+
+  if (!requireRole(adminSession, 'operator')) {
+    return NextResponse.json({ error: '권한이 없습니다' }, { status: 403 })
   }
 
   let body: unknown

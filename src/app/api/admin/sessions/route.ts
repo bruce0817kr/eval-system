@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { SessionStatus } from '@/generated/prisma/client'
 import { z } from 'zod'
 
-import { verifySession } from '@/lib/auth/jwt'
+import { getAdminSession, requireRole } from '@/lib/auth/jwt'
 import { prisma } from '@/lib/db'
 
 const listQuerySchema = z.object({
@@ -29,7 +29,7 @@ function unauthorized() {
 }
 
 export async function GET(request: Request) {
-  const session = await verifySession('admin_session', request)
+  const session = await getAdminSession(request)
 
   if (!session) {
     return unauthorized()
@@ -90,10 +90,14 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const session = await verifySession('admin_session', request)
+  const session = await getAdminSession(request)
 
   if (!session) {
     return unauthorized()
+  }
+
+  if (!requireRole(session, 'operator')) {
+    return NextResponse.json({ error: '권한이 없습니다' }, { status: 403 })
   }
 
   let body: unknown
@@ -123,7 +127,7 @@ export async function POST(request: Request) {
       committeeSize: parsed.data.committeeSize ?? 5,
       trimRule: parsed.data.trimRule ?? 'exclude_min_max',
       status: 'draft',
-      createdById: String(session.sub),
+      createdById: session.id,
     },
     include: {
       _count: {
@@ -134,6 +138,25 @@ export async function POST(request: Request) {
       },
     },
   })
+
+  try {
+    await prisma.auditEvent.create({
+      data: {
+        actorType: 'admin',
+        actorId: session.id,
+        action: 'create',
+        targetType: 'EvaluationSession',
+        targetId: created.id,
+        sessionId: created.id,
+        ipAddress:
+          request.headers.get('x-forwarded-for') ??
+          request.headers.get('x-real-ip') ??
+          null,
+      },
+    })
+  } catch (e) {
+    console.error('Audit log failed:', e)
+  }
 
   return NextResponse.json(created, { status: 201 })
 }

@@ -3,11 +3,12 @@ import { z } from 'zod'
 
 import { logAuditEvent as writeAuditEvent } from '@/lib/audit'
 import { hashPassword } from '@/lib/auth/password'
+import { getAdminSession } from '@/lib/auth/jwt'
 import { prisma } from '@/lib/db'
 
 const registerSchema = z.object({
   email: z.string().trim().email('유효한 이메일 주소를 입력해주세요'),
-  password: z.string().min(6, '비밀번호는 6자 이상이어야 합니다'),
+  password: z.string().min(8, '비밀번호는 8자 이상이어야 합니다'),
   name: z.string().trim().min(1, '이름을 입력해주세요'),
   role: z.enum(['admin', 'operator', 'auditor'], {
     error: '유효한 역할을 선택해주세요',
@@ -69,6 +70,19 @@ export async function POST(request: Request) {
   }
 
   const { email, password, name, role } = parsed.data
+
+  // Bootstrap: DB에 admin이 없으면 최초 계정 생성 허용
+  // 이미 admin이 존재하면 admin 세션 필요
+  const adminCount = await prisma.adminUser.count()
+  if (adminCount > 0) {
+    const session = await getAdminSession(request)
+    if (!session || session.role !== 'admin') {
+      return NextResponse.json(
+        { error: '관리자 권한이 필요합니다' },
+        { status: 403 },
+      )
+    }
+  }
 
   const existingUser = await prisma.adminUser.findUnique({
     where: { email },

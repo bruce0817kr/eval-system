@@ -4,6 +4,7 @@ import { z } from 'zod'
 
 import { logAuditEvent as writeAuditEvent } from '@/lib/audit'
 import { verifyPassword } from '@/lib/auth/password'
+import { rateLimitAdminLogin } from '@/lib/auth/rate-limit'
 import { prisma } from '@/lib/db'
 
 const loginSchema = z.object({
@@ -101,6 +102,14 @@ export async function POST(request: Request) {
   const ipAddress = getClientIp(request)
   const userAgent = request.headers.get('user-agent')
 
+  const rateLimit = await rateLimitAdminLogin(ipAddress ?? 'unknown')
+  if (!rateLimit.allowed) {
+    return NextResponse.json(
+      { error: '로그인 시도 횟수를 초과했습니다. 15분 후 다시 시도해주세요.' },
+      { status: 429 },
+    )
+  }
+
   const user = await prisma.adminUser.findUnique({
     where: { email },
     select: {
@@ -182,16 +191,6 @@ export async function POST(request: Request) {
     name: 'admin_session',
     value: token,
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'strict',
-    path: '/',
-    maxAge: ADMIN_SESSION_MAX_AGE,
-  })
-
-  response.cookies.set({
-    name: 'admin_csrf_token',
-    value: crypto.randomUUID(),
-    httpOnly: false,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'strict',
     path: '/',

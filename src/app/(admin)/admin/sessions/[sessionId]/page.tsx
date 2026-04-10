@@ -1,14 +1,25 @@
 "use client"
 
-import { PlusIcon, RefreshCcwIcon } from "lucide-react"
+import { ClipboardListIcon, PencilIcon, Plus, RefreshCcwIcon, SaveIcon, Trash2, XIcon } from "lucide-react"
 import { useParams } from "next/navigation"
 import { type FormEvent, useCallback, useEffect, useMemo, useState } from "react"
 
-import {
-  ApplicationTable,
-  type ApplicationTableItem,
-} from "@/components/admin/application-table"
+import { ApplicationTable } from "@/components/admin/application-table"
+import { CommitteeAssignDialog } from "@/components/admin/committee-assign-dialog"
+import { ResultsTabContent } from "@/components/admin/results-tab-content"
 import { SessionStatusButton } from "@/components/admin/session-status-button"
+import { SubmissionDialog } from "@/components/admin/submission-dialog"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -19,7 +30,9 @@ import {
   CardTitle,
 } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import { Skeleton } from "@/components/ui/skeleton"
+import { Textarea } from "@/components/ui/textarea"
 import {
   Tabs,
   TabsContent,
@@ -55,10 +68,11 @@ type SessionDetail = {
     itemsCount: number
     snapshotAt: string
   } | null
-  applications: ApplicationTableItem[]
+  applicationsCount: number
   committeeMembers: {
     id: string
     role: string
+    submittedCount: number
     committeeMember: {
       id: string
       name: string
@@ -89,11 +103,20 @@ export default function AdminSessionDetailPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [session, setSession] = useState<SessionDetail | null>(null)
-  const [companyId, setCompanyId] = useState("")
-  const [evaluationOrder, setEvaluationOrder] = useState("")
-  const [applicationError, setApplicationError] = useState<string | null>(null)
-  const [applicationPending, setApplicationPending] = useState(false)
-  const [removingId, setRemovingId] = useState<string | null>(null)
+
+  // committee 탭
+  const [isAssignDialogOpen, setIsAssignDialogOpen] = useState(false)
+  const [committeeError, setCommitteeError] = useState<string | null>(null)
+  const [submissionDialog, setSubmissionDialog] = useState<{ memberId: string; memberName: string } | null>(null)
+
+  // 기본정보 편집 상태
+  const [editingBasic, setEditingBasic] = useState(false)
+  const [editTitle, setEditTitle] = useState("")
+  const [editDescription, setEditDescription] = useState("")
+  const [editCommitteeSize, setEditCommitteeSize] = useState("")
+  const [editTrimRule, setEditTrimRule] = useState("")
+  const [basicSavePending, setBasicSavePending] = useState(false)
+  const [basicSaveError, setBasicSaveError] = useState<string | null>(null)
 
   const fetchSession = useCallback(async () => {
     if (!sessionId) {
@@ -156,69 +179,97 @@ export default function AdminSessionDetailPage() {
     return schema as FormSchema
   }, [session?.formDefinition?.schemaJson])
 
-  async function handleAddApplication(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault()
+  function startEditBasic() {
+    if (!session) return
+    setEditTitle(session.title)
+    setEditDescription(session.description ?? "")
+    setEditCommitteeSize(String(session.committeeSize))
+    setEditTrimRule(session.trimRule)
+    setBasicSaveError(null)
+    setEditingBasic(true)
+  }
 
-    if (!companyId.trim()) {
-      setApplicationError("기업 ID를 입력해주세요")
+  async function handleSaveBasic(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (!session) return
+
+    const size = Number(editCommitteeSize)
+    if (!editTitle.trim()) {
+      setBasicSaveError("회차명을 입력해주세요")
+      return
+    }
+    if (!Number.isInteger(size) || size < 1 || size > 50) {
+      setBasicSaveError("위원 수는 1~50 사이 정수여야 합니다")
       return
     }
 
-    setApplicationPending(true)
-    setApplicationError(null)
+    setBasicSavePending(true)
+    setBasicSaveError(null)
 
     try {
-      const response = await fetch(`/api/admin/sessions/${sessionId}/applications`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+      const response = await fetch(`/api/admin/sessions/${sessionId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          companyId: companyId.trim(),
-          evaluationOrder: evaluationOrder ? Number(evaluationOrder) : undefined,
+          title: editTitle.trim(),
+          description: editDescription.trim() || null,
+          committeeSize: size,
+          trimRule: editTrimRule.trim(),
         }),
       })
 
       if (!response.ok) {
         const result = (await response.json()) as { error?: string }
-        setApplicationError(result.error ?? "기업 추가에 실패했습니다")
+        setBasicSaveError(result.error ?? "저장에 실패했습니다")
         return
       }
 
-      setCompanyId("")
-      setEvaluationOrder("")
+      setEditingBasic(false)
       await fetchSession()
     } catch {
-      setApplicationError("기업 추가 중 네트워크 오류가 발생했습니다")
+      setBasicSaveError("저장 중 네트워크 오류가 발생했습니다")
     } finally {
-      setApplicationPending(false)
+      setBasicSavePending(false)
     }
   }
 
-  async function handleRemoveApplication(applicationId: string) {
-    setRemovingId(applicationId)
-    setApplicationError(null)
-
+  const handleUnassign = async (assignmentId: string) => {
+    setCommitteeError(null)
     try {
-      const response = await fetch(`/api/admin/sessions/${sessionId}/applications`, {
-        method: "DELETE",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ applicationId }),
-      })
-
+      const response = await fetch(
+        `/api/admin/sessions/${sessionId}/committee/${assignmentId}`,
+        { method: "DELETE" },
+      )
       if (!response.ok) {
         const result = (await response.json()) as { error?: string }
-        setApplicationError(result.error ?? "기업 제거에 실패했습니다")
+        setCommitteeError(result.error ?? "위원 해제에 실패했습니다")
         return
       }
-
       await fetchSession()
     } catch {
-      setApplicationError("기업 제거 중 네트워크 오류가 발생했습니다")
-    } finally {
-      setRemovingId(null)
+      setCommitteeError("위원 해제 중 오류가 발생했습니다")
+    }
+  }
+
+  const handleRoleChange = async (assignmentId: string, newRole: "chair" | "member") => {
+    setCommitteeError(null)
+    try {
+      const response = await fetch(
+        `/api/admin/sessions/${sessionId}/committee/${assignmentId}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ role: newRole }),
+        },
+      )
+      if (!response.ok) {
+        const result = (await response.json()) as { error?: string }
+        setCommitteeError(result.error ?? "역할 변경에 실패했습니다")
+        return
+      }
+      await fetchSession()
+    } catch {
+      setCommitteeError("역할 변경 중 오류가 발생했습니다")
     }
   }
 
@@ -272,92 +323,170 @@ export default function AdminSessionDetailPage() {
           <TabsTrigger value="results">결과</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="basic">
+        <TabsContent value="basic" className="space-y-4">
+          {/* 기본정보 카드 */}
+          <Card>
+            <CardHeader className="flex-row items-start justify-between space-y-0">
+              <div>
+                <CardTitle>회차 기본정보</CardTitle>
+                <CardDescription>
+                  {session.status === "draft"
+                    ? "초안 상태에서만 수정할 수 있습니다."
+                    : "오픈 이후에는 수정이 제한됩니다."}
+                </CardDescription>
+              </div>
+              {session.status === "draft" && !editingBasic && (
+                <Button type="button" variant="outline" size="sm" onClick={startEditBasic}>
+                  <PencilIcon className="size-4" />
+                  편집
+                </Button>
+              )}
+            </CardHeader>
+            <CardContent>
+              {editingBasic ? (
+                <form className="space-y-4" onSubmit={handleSaveBasic}>
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div className="space-y-1 md:col-span-2">
+                      <Label htmlFor="edit-title">회차명</Label>
+                      <Input
+                        id="edit-title"
+                        value={editTitle}
+                        onChange={(e) => setEditTitle(e.target.value)}
+                        disabled={basicSavePending}
+                        placeholder="예: 2024년 1차 지원사업 선정평가"
+                      />
+                    </div>
+                    <div className="space-y-1 md:col-span-2">
+                      <Label htmlFor="edit-desc">설명 (선택)</Label>
+                      <Textarea
+                        id="edit-desc"
+                        value={editDescription}
+                        onChange={(e) => setEditDescription(e.target.value)}
+                        disabled={basicSavePending}
+                        rows={3}
+                        placeholder="회차에 대한 설명을 입력하세요"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label htmlFor="edit-size">평가위원 수</Label>
+                      <Input
+                        id="edit-size"
+                        type="number"
+                        min={1}
+                        max={50}
+                        value={editCommitteeSize}
+                        onChange={(e) => setEditCommitteeSize(e.target.value)}
+                        disabled={basicSavePending}
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label htmlFor="edit-trim">절사 규칙</Label>
+                      <Input
+                        id="edit-trim"
+                        value={editTrimRule}
+                        onChange={(e) => setEditTrimRule(e.target.value)}
+                        disabled={basicSavePending}
+                        placeholder="예: exclude_min_max"
+                      />
+                    </div>
+                  </div>
+                  {basicSaveError && (
+                    <p className="text-sm text-destructive">{basicSaveError}</p>
+                  )}
+                  <div className="flex gap-2">
+                    <Button type="submit" size="sm" disabled={basicSavePending}>
+                      <SaveIcon className="size-4" />
+                      저장
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      disabled={basicSavePending}
+                      onClick={() => setEditingBasic(false)}
+                    >
+                      <XIcon className="size-4" />
+                      취소
+                    </Button>
+                  </div>
+                </form>
+              ) : (
+                <div className="grid gap-3 md:grid-cols-2">
+                  <div className="rounded-md border p-3 md:col-span-2">
+                    <p className="text-xs text-muted-foreground">회차명</p>
+                    <p className="text-sm font-medium">{session.title}</p>
+                  </div>
+                  {session.description && (
+                    <div className="rounded-md border p-3 md:col-span-2">
+                      <p className="text-xs text-muted-foreground">설명</p>
+                      <p className="text-sm">{session.description}</p>
+                    </div>
+                  )}
+                  <div className="rounded-md border p-3">
+                    <p className="text-xs text-muted-foreground">위원 수</p>
+                    <p className="text-sm font-medium">{session.committeeSize}명</p>
+                  </div>
+                  <div className="rounded-md border p-3">
+                    <p className="text-xs text-muted-foreground">절사 규칙</p>
+                    <p className="text-sm font-medium">{session.trimRule}</p>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* 상태 변경 카드 */}
           <Card>
             <CardHeader>
-              <CardTitle>회차 기본정보</CardTitle>
-              <CardDescription>상태 전이와 운영 파라미터를 확인하세요.</CardDescription>
+              <CardTitle>상태 변경</CardTitle>
+              <CardDescription>회차 진행 단계를 전환합니다.</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid gap-3 md:grid-cols-2">
-                <div className="rounded-md border p-3">
-                  <p className="text-xs text-muted-foreground">위원 수</p>
-                  <p className="text-sm font-medium">{session.committeeSize}명</p>
-                </div>
-                <div className="rounded-md border p-3">
-                  <p className="text-xs text-muted-foreground">절사 규칙</p>
-                  <p className="text-sm font-medium">{session.trimRule}</p>
-                </div>
-              </div>
-              <div className="space-y-2">
-                <p className="text-sm font-medium">상태 변경</p>
-                <div className="flex flex-wrap gap-2">
-                  {transitionTargets.length > 0 ? (
-                    transitionTargets.map((target) => (
-                      <SessionStatusButton
-                        key={target}
-                        sessionId={session.id}
-                        targetStatus={target}
-                        currentStatus={session.status}
-                        onChanged={fetchSession}
-                      />
-                    ))
-                  ) : (
-                    <p className="text-sm text-muted-foreground">가능한 상태 변경이 없습니다.</p>
-                  )}
-                </div>
+            <CardContent>
+              <div className="flex flex-wrap gap-2">
+                {transitionTargets.length > 0 ? (
+                  transitionTargets.map((target) => (
+                    <SessionStatusButton
+                      key={target}
+                      sessionId={session.id}
+                      targetStatus={target}
+                      currentStatus={session.status}
+                      onChanged={fetchSession}
+                    />
+                  ))
+                ) : (
+                  <p className="text-sm text-muted-foreground">가능한 상태 변경이 없습니다.</p>
+                )}
               </div>
             </CardContent>
           </Card>
         </TabsContent>
 
-        <TabsContent value="applications" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>기업 추가</CardTitle>
-              <CardDescription>기업 ID로 회차에 기업을 배정합니다.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <form className="grid gap-3 md:grid-cols-[1fr_160px_auto]" onSubmit={handleAddApplication}>
-                <Input
-                  placeholder="기업 ID"
-                  value={companyId}
-                  onChange={(event) => setCompanyId(event.target.value)}
-                  disabled={applicationPending}
-                />
-                <Input
-                  type="number"
-                  min={1}
-                  placeholder="평가 순서(선택)"
-                  value={evaluationOrder}
-                  onChange={(event) => setEvaluationOrder(event.target.value)}
-                  disabled={applicationPending}
-                />
-                <Button type="submit" disabled={applicationPending}>
-                  <PlusIcon className="size-4" />
-                  기업 추가
-                </Button>
-              </form>
-              {applicationError ? (
-                <p className="mt-2 text-sm text-destructive">{applicationError}</p>
-              ) : null}
-            </CardContent>
-          </Card>
-
-          <ApplicationTable
-            applications={session.applications}
-            onRemove={handleRemoveApplication}
-            removingId={removingId}
-          />
+        <TabsContent value="applications">
+          <ApplicationTable sessionId={sessionId} />
         </TabsContent>
 
         <TabsContent value="committee">
           <Card>
-            <CardHeader>
-              <CardTitle>배정된 평가위원</CardTitle>
-              <CardDescription>현재 회차에 배정된 위원 목록입니다.</CardDescription>
+            <CardHeader className="flex-row items-start justify-between space-y-0">
+              <div>
+                <CardTitle>배정된 평가위원</CardTitle>
+                <CardDescription>
+                  현재 회차에 배정된 위원 목록입니다. ({session.committeeMembers.length} / {session.committeeSize}명)
+                </CardDescription>
+              </div>
+              <Button
+                type="button"
+                size="sm"
+                onClick={() => setIsAssignDialogOpen(true)}
+              >
+                <Plus className="size-4" />
+                위원 배정
+              </Button>
             </CardHeader>
-            <CardContent>
+            <CardContent className="space-y-3">
+              {committeeError && (
+                <p className="text-sm text-destructive">{committeeError}</p>
+              )}
               <div className="rounded-lg border">
                 <Table>
                   <TableHeader>
@@ -365,24 +494,93 @@ export default function AdminSessionDetailPage() {
                       <TableHead>이름</TableHead>
                       <TableHead>연락처</TableHead>
                       <TableHead>소속</TableHead>
-                      <TableHead>직책</TableHead>
                       <TableHead>역할</TableHead>
+                      <TableHead>진행현황</TableHead>
+                      <TableHead className="text-right">액션</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {session.committeeMembers.length > 0 ? (
                       session.committeeMembers.map((member) => (
                         <TableRow key={member.id}>
-                          <TableCell>{member.committeeMember.name}</TableCell>
+                          <TableCell className="font-medium">{member.committeeMember.name}</TableCell>
                           <TableCell>{member.committeeMember.phone}</TableCell>
                           <TableCell>{member.committeeMember.organization || "-"}</TableCell>
-                          <TableCell>{member.committeeMember.position || "-"}</TableCell>
-                          <TableCell>{member.role}</TableCell>
+                          <TableCell>
+                            {member.role === "chair" ? (
+                              <Badge className="bg-amber-100 text-amber-700 hover:bg-amber-100">위원장</Badge>
+                            ) : (
+                              <Badge variant="secondary">위원</Badge>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            <span className="text-sm text-muted-foreground">
+                              {member.submittedCount} / {session.applicationsCount} 제출
+                            </span>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex justify-end gap-2">
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                onClick={() =>
+                                  setSubmissionDialog({
+                                    memberId: member.committeeMember.id,
+                                    memberName: member.committeeMember.name,
+                                  })
+                                }
+                              >
+                                <ClipboardListIcon className="size-4" />
+                                제출 현황
+                              </Button>
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                onClick={() =>
+                                  void handleRoleChange(
+                                    member.id,
+                                    member.role === "chair" ? "member" : "chair",
+                                  )
+                                }
+                              >
+                                {member.role === "chair" ? "위원으로" : "위원장으로"}
+                              </Button>
+                              <AlertDialog>
+                                <AlertDialogTrigger
+                                  render={
+                                    <Button type="button" size="sm" variant="destructive" />
+                                  }
+                                >
+                                  <Trash2 className="size-4" />
+                                  해제
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                  <AlertDialogHeader>
+                                    <AlertDialogTitle>위원 배정을 해제할까요?</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                      {member.committeeMember.name} 위원의 배정을 해제합니다.
+                                    </AlertDialogDescription>
+                                  </AlertDialogHeader>
+                                  <AlertDialogFooter>
+                                    <AlertDialogCancel>취소</AlertDialogCancel>
+                                    <AlertDialogAction
+                                      variant="destructive"
+                                      onClick={() => void handleUnassign(member.id)}
+                                    >
+                                      해제
+                                    </AlertDialogAction>
+                                  </AlertDialogFooter>
+                                </AlertDialogContent>
+                              </AlertDialog>
+                            </div>
+                          </TableCell>
                         </TableRow>
                       ))
                     ) : (
                       <TableRow>
-                        <TableCell colSpan={5} className="h-24 text-center text-muted-foreground">
+                        <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
                           배정된 평가위원이 없습니다.
                         </TableCell>
                       </TableRow>
@@ -450,14 +648,25 @@ export default function AdminSessionDetailPage() {
         </TabsContent>
 
         <TabsContent value="results">
-          <Card>
-            <CardHeader>
-              <CardTitle>결과</CardTitle>
-              <CardDescription>결과 관리 UI는 Phase 4에서 제공됩니다.</CardDescription>
-            </CardHeader>
-          </Card>
+          <ResultsTabContent sessionId={sessionId} sessionStatus={session.status} />
         </TabsContent>
       </Tabs>
+
+      <CommitteeAssignDialog
+        open={isAssignDialogOpen}
+        onOpenChange={setIsAssignDialogOpen}
+        sessionId={sessionId}
+        alreadyAssignedIds={session.committeeMembers.map((m) => m.committeeMember.id)}
+        onAssigned={() => void fetchSession()}
+      />
+
+      <SubmissionDialog
+        sessionId={sessionId}
+        memberId={submissionDialog?.memberId ?? ""}
+        memberName={submissionDialog?.memberName ?? ""}
+        open={submissionDialog !== null}
+        onOpenChange={(open) => { if (!open) setSubmissionDialog(null) }}
+      />
     </div>
   )
 }

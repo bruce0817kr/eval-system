@@ -111,5 +111,23 @@ export async function POST(request: Request) {
     data: parsed.data,
   })
 
+  try {
+    await prisma.auditEvent.create({
+      data: {
+        actorType: 'admin',
+        actorId: admin.id,
+        action: 'create',
+        targetType: 'Company',
+        targetId: company.id,
+        ipAddress:
+          request.headers.get('x-forwarded-for') ??
+          request.headers.get('x-real-ip') ??
+          null,
+      },
+    })
+  } catch (e) {
+    console.error('Audit log failed:', e)
+  }
+
   return NextResponse.json(company, { status: 201 })
 }

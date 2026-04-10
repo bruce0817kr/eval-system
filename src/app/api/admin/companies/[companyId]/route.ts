@@ -109,6 +109,24 @@ export async function PATCH(
     data: parsed.data,
   })
 
+  try {
+    await prisma.auditEvent.create({
+      data: {
+        actorType: 'admin',
+        actorId: admin.id,
+        action: 'update',
+        targetType: 'Company',
+        targetId: companyId,
+        ipAddress:
+          request.headers.get('x-forwarded-for') ??
+          request.headers.get('x-real-ip') ??
+          null,
+      },
+    })
+  } catch (e) {
+    console.error('Audit log failed:', e)
+  }
+
   return NextResponse.json(updated)
 }
 
@@ -148,6 +166,24 @@ export async function DELETE(
   await prisma.company.delete({
     where: { id: companyId },
   })
+
+  try {
+    await prisma.auditEvent.create({
+      data: {
+        actorType: 'admin',
+        actorId: admin.id,
+        action: 'delete',
+        targetType: 'Company',
+        targetId: companyId,
+        ipAddress:
+          request.headers.get('x-forwarded-for') ??
+          request.headers.get('x-real-ip') ??
+          null,
+      },
+    })
+  } catch (e) {
+    console.error('Audit log failed:', e)
+  }
 
   return NextResponse.json({ ok: true })
 }

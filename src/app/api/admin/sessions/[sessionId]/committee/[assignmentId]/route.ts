@@ -39,6 +39,25 @@ export async function DELETE(request: Request, context: SessionAssignmentContext
     where: { id: assignmentId },
   })
 
+  try {
+    await prisma.auditEvent.create({
+      data: {
+        actorType: 'admin',
+        actorId: adminSession.id,
+        action: 'delete',
+        targetType: 'SessionCommitteeAssignment',
+        targetId: assignmentId,
+        sessionId,
+        ipAddress:
+          request.headers.get('x-forwarded-for') ??
+          request.headers.get('x-real-ip') ??
+          null,
+      },
+    })
+  } catch (e) {
+    console.error('Audit log failed:', e)
+  }
+
   return NextResponse.json({ success: true }, { status: 200 })
 }
 
@@ -104,6 +123,26 @@ export async function PATCH(request: Request, context: SessionAssignmentContext)
           where: { id: assignmentId },
           data: { role: 'member' },
         })
+
+  try {
+    await prisma.auditEvent.create({
+      data: {
+        actorType: 'admin',
+        actorId: adminSession.id,
+        action: 'update',
+        targetType: 'SessionCommitteeAssignment',
+        targetId: assignmentId,
+        sessionId,
+        ipAddress:
+          request.headers.get('x-forwarded-for') ??
+          request.headers.get('x-real-ip') ??
+          null,
+        payloadJson: { role: parsed.data.role },
+      },
+    })
+  } catch (e) {
+    console.error('Audit log failed:', e)
+  }
 
   return NextResponse.json(updated, { status: 200 })
 }

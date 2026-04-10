@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 
-import { verifySession } from '@/lib/auth/jwt'
+import { getAdminSession } from '@/lib/auth/jwt'
 import { prisma } from '@/lib/db'
 
 const patchSessionSchema = z
@@ -33,7 +33,7 @@ export async function GET(
   request: Request,
   context: { params: Promise<{ sessionId: string }> },
 ) {
-  const adminSession = await verifySession('admin_session', request)
+  const adminSession = await getAdminSession(request)
 
   if (!adminSession) {
     return unauthorized()
@@ -75,14 +75,38 @@ export async function GET(
     )
   }
 
-  return NextResponse.json(session, { status: 200 })
+  // 위원별 제출 완료(submitted/signed) 카운트
+  const submissionCounts = await prisma.evaluationSubmission.groupBy({
+    by: ['committeeMemberId'],
+    where: {
+      sessionId,
+      submissionState: { in: ['submitted', 'signed'] },
+    },
+    _count: { id: true },
+  })
+
+  const countMap: Record<string, number> = {}
+  for (const s of submissionCounts) {
+    countMap[s.committeeMemberId] = s._count.id
+  }
+
+  const response = {
+    ...session,
+    applicationsCount: session._count.applications,
+    committeeMembers: session.committeeMembers.map((m) => ({
+      ...m,
+      submittedCount: countMap[m.committeeMemberId] ?? 0,
+    })),
+  }
+
+  return NextResponse.json(response, { status: 200 })
 }
 
 export async function PATCH(
   request: Request,
   context: { params: Promise<{ sessionId: string }> },
 ) {
-  const adminSession = await verifySession('admin_session', request)
+  const adminSession = await getAdminSession(request)
 
   if (!adminSession) {
     return unauthorized()

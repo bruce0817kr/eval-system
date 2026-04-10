@@ -1,9 +1,10 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { ArrowDown, ArrowUp, Plus, Trash2 } from 'lucide-react'
+import { ArrowDown, ArrowUp, BanIcon, FileTextIcon, Plus, RotateCcwIcon, Trash2 } from 'lucide-react'
 
 import { CompanySearchDialog } from '@/components/admin/company-search-dialog'
+import { DocumentDialog } from '@/components/admin/document-dialog'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
@@ -70,9 +71,11 @@ function renderStatusBadge(status: ApplicationStatus) {
 export function ApplicationTable(props: Props) {
   const [items, setItems] = useState<ApplicationTableItem[]>([])
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const [page, setPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
   const [searchDialogOpen, setSearchDialogOpen] = useState(false)
+  const [docDialog, setDocDialog] = useState<{ applicationId: string; companyName: string } | null>(null)
 
   const isSessionMode = 'sessionId' in props
   const sessionId = isSessionMode ? props.sessionId : null
@@ -83,6 +86,7 @@ export function ApplicationTable(props: Props) {
     }
 
     setLoading(true)
+    setError(null)
 
     try {
       const response = await fetch(
@@ -90,12 +94,15 @@ export function ApplicationTable(props: Props) {
       )
 
       if (!response.ok) {
+        setError('기업 목록을 불러오지 못했습니다')
         return
       }
 
       const data = (await response.json()) as ApplicationsResponse
       setItems(data.items ?? [])
       setTotalPages(data.totalPages ?? 1)
+    } catch {
+      setError('네트워크 오류가 발생했습니다')
     } finally {
       setLoading(false)
     }
@@ -136,13 +143,16 @@ export function ApplicationTable(props: Props) {
     local[nextIndex] = localTarget
     setItems(local)
 
-    await fetch(`/api/admin/sessions/${sessionId}/applications/reorder`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ orderedIds: reordered }),
-    })
-
-    await fetchApplications()
+    try {
+      await fetch(`/api/admin/sessions/${sessionId}/applications/reorder`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orderedIds: reordered }),
+      })
+      await fetchApplications()
+    } catch {
+      setError('순서 변경에 실패했습니다')
+    }
   }
 
   async function addCompany(company: { id: string }) {
@@ -150,13 +160,21 @@ export function ApplicationTable(props: Props) {
       return
     }
 
-    await fetch(`/api/admin/sessions/${sessionId}/applications`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ companyId: company.id }),
-    })
-
-    await fetchApplications()
+    try {
+      const res = await fetch(`/api/admin/sessions/${sessionId}/applications`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ companyId: company.id }),
+      })
+      if (!res.ok) {
+        const body = (await res.json()) as { error?: string }
+        setError(body.error ?? '기업 추가에 실패했습니다')
+        return
+      }
+      await fetchApplications()
+    } catch {
+      setError('기업 추가에 실패했습니다')
+    }
   }
 
   async function removeApplication(applicationId: string) {
@@ -165,12 +183,16 @@ export function ApplicationTable(props: Props) {
     }
 
     if (isSessionMode && sessionId) {
-      await fetch(`/api/admin/sessions/${sessionId}/applications`, {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ applicationId }),
-      })
-      await fetchApplications()
+      try {
+        await fetch(`/api/admin/sessions/${sessionId}/applications`, {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ applicationId }),
+        })
+        await fetchApplications()
+      } catch {
+        setError('기업 제거에 실패했습니다')
+      }
       return
     }
 
@@ -179,8 +201,24 @@ export function ApplicationTable(props: Props) {
     }
   }
 
+  async function toggleExclude(applicationId: string, currentStatus: ApplicationStatus) {
+    if (!sessionId) return
+    const newStatus: ApplicationStatus = currentStatus === 'excluded' ? 'registered' : 'excluded'
+    try {
+      await fetch(`/api/admin/sessions/${sessionId}/applications`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ applicationId, status: newStatus }),
+      })
+      await fetchApplications()
+    } catch {
+      setError('상태 변경에 실패했습니다')
+    }
+  }
+
   return (
     <div className="space-y-3">
+      {error && <p className="text-sm text-destructive">{error}</p>}
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-semibold">신청 기업 목록</h3>
         {isSessionMode ? (
@@ -246,15 +284,45 @@ export function ApplicationTable(props: Props) {
                 <TableCell>{item.company.industry ?? '-'}</TableCell>
                 <TableCell>{renderStatusBadge(item.status)}</TableCell>
                 <TableCell className="text-right">
-                  <Button
-                    variant="ghost"
-                    size="icon-sm"
-                    onClick={() => removeApplication(item.id)}
-                    disabled={!isSessionMode && props.removingId === item.id}
-                    aria-label="신청 제거"
-                  >
-                    <Trash2 className="text-destructive" />
-                  </Button>
+                  <div className="flex items-center justify-end gap-1">
+                    {isSessionMode && (
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        onClick={() =>
+                          setDocDialog({ applicationId: item.id, companyName: item.company.name })
+                        }
+                        aria-label="서류 관리"
+                        title="서류 관리"
+                      >
+                        <FileTextIcon className="size-4" />
+                      </Button>
+                    )}
+                    {isSessionMode && (
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        onClick={() => void toggleExclude(item.id, item.status)}
+                        aria-label={item.status === 'excluded' ? '제외 해제' : '제외'}
+                        title={item.status === 'excluded' ? '제외 해제' : '제외'}
+                      >
+                        {item.status === 'excluded' ? (
+                          <RotateCcwIcon className="size-4 text-muted-foreground" />
+                        ) : (
+                          <BanIcon className="size-4 text-amber-600" />
+                        )}
+                      </Button>
+                    )}
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      onClick={() => removeApplication(item.id)}
+                      disabled={!isSessionMode && props.removingId === item.id}
+                      aria-label="신청 제거"
+                    >
+                      <Trash2 className="text-destructive" />
+                    </Button>
+                  </div>
                 </TableCell>
               </TableRow>
             ))
@@ -284,12 +352,21 @@ export function ApplicationTable(props: Props) {
         </div>
       ) : null}
 
-      {isSessionMode ? (
-        <CompanySearchDialog
-          open={searchDialogOpen}
-          onOpenChange={setSearchDialogOpen}
-          onSelectCompany={addCompany}
-        />
+      {isSessionMode && sessionId ? (
+        <>
+          <CompanySearchDialog
+            open={searchDialogOpen}
+            onOpenChange={setSearchDialogOpen}
+            onSelectCompany={addCompany}
+          />
+          <DocumentDialog
+            sessionId={sessionId}
+            applicationId={docDialog?.applicationId ?? ''}
+            companyName={docDialog?.companyName ?? ''}
+            open={docDialog !== null}
+            onOpenChange={(open) => { if (!open) setDocDialog(null) }}
+          />
+        </>
       ) : null}
     </div>
   )
