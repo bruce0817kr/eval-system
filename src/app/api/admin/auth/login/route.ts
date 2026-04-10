@@ -191,7 +191,7 @@ export async function POST(request: Request) {
     name: 'admin_session',
     value: token,
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
+    secure: request.url.startsWith('https://'),
     sameSite: 'strict',
     path: '/',
     maxAge: ADMIN_SESSION_MAX_AGE,

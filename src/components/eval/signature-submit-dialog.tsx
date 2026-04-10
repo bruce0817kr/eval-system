@@ -85,6 +85,7 @@ export function SignatureSubmitDialog({
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const signatureRef = useRef<SignaturePad | null>(null)
+  const signatureDataUrlRef = useRef<string | null>(null)
 
   useEffect(() => {
     if (!open || !canvasRef.current) {
@@ -109,6 +110,7 @@ export function SignatureSubmitDialog({
       setOtpCode('')
       setOtpSent(false)
       setOtpData(null)
+      signatureDataUrlRef.current = null
     }
   }, [open])
 
@@ -174,7 +176,8 @@ export function SignatureSubmitDialog({
   const submitAndSign = async () => {
     setError(null)
 
-    if (!signatureRef.current || signatureRef.current.isEmpty()) {
+    const dataUrl = signatureDataUrlRef.current
+    if (!dataUrl) {
       setError('서명을 입력해 주세요')
       return
     }
@@ -200,7 +203,6 @@ export function SignatureSubmitDialog({
       }
 
       const submitData = (await submitResponse.json()) as { submission: { id: string } }
-      const dataUrl = signatureRef.current.toDataURL('image/png')
 
       const signResponse = await fetch(`/api/eval/sessions/${sessionId}/sign`, {
         method: 'POST',
@@ -360,6 +362,7 @@ export function SignatureSubmitDialog({
                   return
                 }
 
+                signatureDataUrlRef.current = signatureRef.current.toDataURL('image/png')
                 setError(null)
                 setStep(3)
               }}

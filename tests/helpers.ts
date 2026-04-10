@@ -63,17 +63,36 @@ export async function clearRedisOTP(phone: string): Promise<void> {
   const normalized = phone.replace(/-/g, '')
   try {
     execSync(
-      `docker exec eval-redis-1 redis-cli -p 6379 DEL "otp:${normalized}"`,
+      `docker exec eval-redis-1 redis-cli -p 6379 DEL "otp:${normalized}" "otp:rate:${normalized}"`,
     )
   } catch {
     // Empty catch - cleanup failures are non-critical
   }
 }
 
+export async function clearAdminRateLimit(): Promise<void> {
+  try {
+    const keys = execSync(
+      `docker exec eval-redis-1 redis-cli -p 6379 KEYS "admin:login:rate:*"`,
+      { encoding: 'utf8' },
+    ).trim()
+    if (keys) {
+      const keyList = keys.split('\n').join(' ')
+      execSync(`docker exec eval-redis-1 redis-cli -p 6379 DEL ${keyList}`)
+    }
+  } catch {
+    // cleanup failures are non-critical
+  }
+}
+
 export function clearSubmissions(memberId: string, sessionId: string): void {
   try {
     execSync(
-      `docker exec eval-postgres psql -U eval -d eval_db -c "DELETE FROM evaluation_submission WHERE committee_member_id = '${memberId}' AND session_id = '${sessionId}'"`,
+      `docker exec eval-postgres psql -U eval -d eval_db -c "DELETE FROM signature_artifact WHERE \\\"submissionId\\\" IN (SELECT id FROM evaluation_submission WHERE \\\"committeeMemberId\\\" = '${memberId}' AND \\\"sessionId\\\" = '${sessionId}')"`,
+      { encoding: 'utf8' },
+    )
+    execSync(
+      `docker exec eval-postgres psql -U eval -d eval_db -c "DELETE FROM evaluation_submission WHERE \\\"committeeMemberId\\\" = '${memberId}' AND \\\"sessionId\\\" = '${sessionId}'"`,
       { encoding: 'utf8' },
     )
   } catch {

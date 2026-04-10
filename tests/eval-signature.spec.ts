@@ -2,7 +2,7 @@ import { test, expect } from './page-objects'
 import { waitForOTP, clearRedisOTP, clearSubmissions } from './helpers'
 
 // setup-test-data.mjs 로 생성된 전용 E2E 데이터 사용
-const EVALUATOR_PHONE = '010-1111-1111'
+const EVALUATOR_PHONE = '010-2222-2222'
 const EVALUATOR_NAME = '김평가'
 const MEMBER_ID = 'test-member-e2e'
 const SESSION_ID = 'test-session-e2e'
@@ -56,7 +56,7 @@ test.describe('서명 제출 E2E', () => {
     }
 
     // 4. "제출" 버튼 클릭 → SignatureSubmitDialog 열기
-    const submitBtn = page.locator('button:has-text("제출")').last()
+    const submitBtn = page.locator('button:has-text("제출"):visible').first()
     await expect(submitBtn).toBeVisible({ timeout: 10000 })
     await submitBtn.click()
 
@@ -76,6 +76,9 @@ test.describe('서명 제출 E2E', () => {
       return
     }
 
+    // SignaturePad 동적 import 완료 대기 (new Function trick으로 비동기 로드)
+    await page.waitForTimeout(2000)
+
     // SignaturePad가 리스닝하는 pointer 이벤트로 서명 그리기
     await page.mouse.move(box.x + 60, box.y + 60)
     await page.mouse.down()
@@ -92,10 +95,10 @@ test.describe('서명 제출 E2E', () => {
     // 7. Step 3: OTP 전송 → 입력 → 제출
     const sendOtpBtn = page.locator('button:has-text("OTP 전송")')
     await expect(sendOtpBtn).toBeVisible({ timeout: 5000 })
+    // 기존 OTP 먼저 지우고 클릭
+    await clearRedisOTP(EVALUATOR_PHONE)
     await sendOtpBtn.click()
 
-    // Redis에서 새 OTP 읽기
-    await clearRedisOTP(EVALUATOR_PHONE) // 기존 것 지우고
     // request-otp 응답에 code가 포함됨 (개발 환경)
     const signOtp = await waitForOTP(page, EVALUATOR_PHONE, 15000)
     test.skip(!signOtp, '서명용 OTP를 가져올 수 없습니다')

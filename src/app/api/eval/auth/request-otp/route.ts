@@ -1,9 +1,12 @@
 import { NextResponse } from 'next/server'
+import { Pool } from 'pg'
 import { z } from 'zod'
 
 import { logAuditEvent as writeAuditEvent } from '@/lib/audit'
 import { generateOtp, rateLimitOtp, storeOtpForOctomo } from '@/lib/auth/otp'
-import { prisma } from '@/lib/db'
+
+// Prisma WASM 컴파일러 버그로 인해 raw pg 사용
+const pgPool = new Pool({ connectionString: process.env.DATABASE_URL })
 
 const OCTOMO_TARGET_NUMBER = process.env.OCTOMO_TARGET_NUMBER ?? '1666-3538'
 
@@ -90,19 +93,12 @@ export async function POST(request: Request) {
     )
   }
 
-  const member = await prisma.committeeMember.findFirst({
-    where: {
-      name,
-      phone: {
-        in: [normalizedPhone, formatPhone(normalizedPhone)],
-      },
-    },
-    select: {
-      id: true,
-      name: true,
-      phone: true,
-    },
-  })
+  // Prisma WASM 버그 우회: raw pg 직접 사용 (name + phone SQL 파라미터로 전달)
+  const { rows } = await pgPool.query<{ id: string; name: string; phone: string }>(
+    'SELECT id, name, phone FROM committee_member WHERE name = $1 AND phone = ANY($2::text[]) LIMIT 1',
+    [name, [normalizedPhone, formatPhone(normalizedPhone)]],
+  )
+  const member = rows[0] ?? null
 
   if (!member) {
     return NextResponse.json(

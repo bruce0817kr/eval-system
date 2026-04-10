@@ -21,7 +21,7 @@ const testData = {
   member: {
     id: 'test-member-e2e',
     name: '김평가',
-    phone: '01011111111',
+    phone: '01022222222',
     organization: '테스트대학',
     position: '교수',
     field: '컴퓨터공학',
@@ -56,7 +56,7 @@ function execPrisma(query) {
   const escaped = query.replace(/"/g, '\\"')
   try {
     const result = execSync(
-      `docker exec eval-postgres-1 psql -U eval -d eval_db -c "${escaped}"`,
+      `docker exec eval-postgres psql -U eval -d eval_db -c "${escaped}"`,
       { encoding: 'utf8' },
     )
     return result
@@ -67,7 +67,7 @@ function execPrisma(query) {
 
 function checkPrismaConnection() {
   try {
-    execSync('docker exec eval-postgres-1 psql -U eval -d eval_db -c "SELECT 1;"', {
+    execSync('docker exec eval-postgres psql -U eval -d eval_db -c "SELECT 1;"', {
       encoding: 'utf8',
     })
     return true
@@ -79,7 +79,7 @@ function checkPrismaConnection() {
 function checkS3Connection() {
   try {
     execSync(
-      `docker exec eval-minio-1 mc ls minio/`,
+      `docker exec eval-minio mc ls minio/`,
       { encoding: 'utf8' },
     )
     return true
@@ -163,8 +163,8 @@ async function setupTestData() {
   }
 
   console.log('\n2. 기존 테스트 데이터 정리...')
-  execPrisma(`DELETE FROM evaluation_draft WHERE committee_member_id = '${testData.member.id}'`)
-  execPrisma(`DELETE FROM evaluation_submission WHERE committee_member_id = '${testData.member.id}'`)
+  execPrisma(`DELETE FROM evaluation_draft WHERE "committeeMemberId" = '${testData.member.id}'`)
+  execPrisma(`DELETE FROM evaluation_submission WHERE "committeeMemberId" = '${testData.member.id}'`)
   execPrisma(`DELETE FROM application_document WHERE application_id IN (SELECT id FROM application WHERE session_id = '${testData.session.id}')`)
   execPrisma(`DELETE FROM application WHERE session_id = '${testData.session.id}'`)
   execPrisma(`DELETE FROM company WHERE id = '${testData.company.id}'`)

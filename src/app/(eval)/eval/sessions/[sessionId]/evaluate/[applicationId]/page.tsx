@@ -1,14 +1,23 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import dynamic from 'next/dynamic'
 import { useParams, useRouter } from 'next/navigation'
 
-import { EvaluationForm } from '@/components/eval/evaluation-form'
-import { PdfViewer } from '@/components/eval/pdf-viewer'
-import { SignatureSubmitDialog } from '@/components/eval/signature-submit-dialog'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { EvaluationForm } from '@/components/eval/evaluation-form'
+import { PdfViewer } from '@/components/eval/pdf-viewer'
+
+// signature_pad는 DOMMatrix 등 브라우저 전용 API를 사용하므로 SSR에서 제외
+const SignatureSubmitDialog = dynamic(
+  () =>
+    import('@/components/eval/signature-submit-dialog').then((m) => ({
+      default: m.SignatureSubmitDialog,
+    })),
+  { ssr: false },
+)
 import {
   ResizableHandle,
   ResizablePanel,

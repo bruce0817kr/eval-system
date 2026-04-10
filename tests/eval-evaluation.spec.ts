@@ -90,7 +90,7 @@ test.describe('평가 플로우 E2E', () => {
     await expect(page.locator('text=2026')).toBeVisible()
 
     // 3. 세션 카드 클릭
-    const sessionCard = page.locator('text=2026年度 新規事業 選定評価').first()
+    const sessionCard = page.locator('text=2026년 상반기 기술평가').first()
     await sessionCard.click()
 
     // 4. 신청 목록 페이지로 이동

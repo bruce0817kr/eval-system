@@ -1,5 +1,6 @@
 import { test, expect } from './page-objects'
 import type { Page } from '@playwright/test'
+import { clearAdminRateLimit } from './helpers'
 
 const ADMIN_EMAIL = 'testadmin@test.com'
 const ADMIN_PASSWORD = 'TestAdmin123!'
@@ -19,6 +20,10 @@ async function adminLogin(page: Page) {
 }
 
 test.describe('관리자 로그인', () => {
+  test.beforeEach(async () => {
+    await clearAdminRateLimit()
+  })
+
   test('관리자 로그인 페이지가 렌더링된다', async ({ page }) => {
     await page.goto('/admin/login')
     await expect(page.locator('text=관리자 로그인')).toBeVisible()
@@ -40,6 +45,7 @@ test.describe('관리자 로그인', () => {
 
 test.describe('관리자 세션 관리', () => {
   test.beforeEach(async ({ page }) => {
+    await clearAdminRateLimit()
     await adminLogin(page)
   })
 

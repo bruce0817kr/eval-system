@@ -1,7 +1,7 @@
 # 인수인계서 - QA 이슈 수정 및 기능 구현
 
 **최초 작성**: 2026-04-03  
-**최종 업데이트**: 2026-04-10  
+**최종 업데이트**: 2026-04-10 (2차)  
 **다음 작업자**: 개발팀
 
 ---
@@ -50,7 +50,22 @@
 ### 1.5 E2E 테스트
 
 - `eval-signature.spec.ts`: 전체 UI 플로우 + 중복 제출 방지 API 검증 2개 구현
-- `helpers.ts`: `clearSubmissions(memberId, sessionId)` DB 클린업 헬퍼 추가
+- `helpers.ts`: `clearSubmissions(memberId, sessionId)`, `clearAdminRateLimit()` 헬퍼 추가
+
+### 1.6 2차 수정 (2026-04-10 2차)
+
+| 파일 | 수정 내용 |
+|------|-----------|
+| `evaluate/[applicationId]/page.tsx` | `SignatureSubmitDialog`를 `next/dynamic({ ssr: false })`로 동적 로드 — `signature_pad`가 SSR에서 `DOMMatrix is not defined` 에러 유발 |
+| `signature-submit-dialog.tsx` | `signatureDataUrlRef` 추가 — Step 2→3 전환 시 서명 데이터 캡처 후 OTP 제출 시 ref 사용 (비동기 OTP 처리 중 SignaturePad 인스턴스 stale 문제 해결) |
+| `request-otp/route.ts` & `verify-otp/route.ts` | Prisma WASM 컴파일러 버그 우회 — `prisma.committeeMember.findFirst` → raw `pg.Pool` 직접 쿼리 |
+| `admin/auth/login/route.ts` & `verify-otp/route.ts` | 쿠키 `secure` 플래그: `NODE_ENV === 'production'` → `request.url.startsWith('https://')` |
+| `scripts/setup-test-data.mjs` | 컨테이너명 `eval-postgres-1`→`eval-postgres`, `eval-minio-1`→`eval-minio`; 전화번호 `01011111111`→`01022222222`; camelCase 컬럼명 수정 |
+| `playwright.config.ts` | `workers: undefined` → `workers: 1` (로컬도 단일 워커 강제) |
+| `tests/helpers.ts` | `clearRedisOTP`에 `otp:rate:*` 키 추가 삭제; `clearAdminRateLimit()` 신규; `clearSubmissions`에 `signature_artifact` 선행 삭제 + camelCase 컬럼명 |
+| `tests/eval-admin.spec.ts` | `beforeEach`에 `clearAdminRateLimit()` 추가 |
+| `tests/eval-evaluation.spec.ts` | 세션 카드 텍스트 일어 → 한국어 (`2026년 상반기 기술평가`) |
+| `tests/eval-signature.spec.ts` | 전화번호 업데이트; 제출 버튼 셀렉터 개선; SignaturePad 초기화 2000ms 대기; OTP 클리어 순서 수정 |
 
 ---
 
@@ -72,8 +87,8 @@ tests/
 
 | 구분 | 값 |
 |------|-----|
-| 테스트 평가위원 | 김평가 (`test-member-e2e`, phone: 01011111111) |
-| 평가 세션 | `test-session-e2e` (ses001) |
+| 테스트 평가위원 | 김평가 (`test-member-e2e`, phone: 01022222222) |
+| 평가 세션 | `test-session-e2e` (2026년 상반기 기술평가) |
 | 신청 번호 | `app-test-session-e2e` (app001~app010) |
 | 관리자 계정 | testadmin@test.com / TestAdmin123! |
 | auditor 계정 | auditor@test.com / Auditor123! |
@@ -81,14 +96,18 @@ tests/
 ### 2.3 테스트 실행
 
 ```bash
+# 테스트 데이터 초기화 (필수)
+node scripts/setup-test-data.mjs
+
 # 전체 실행
 npx playwright test --workers=1 --timeout=60000
 
 # 특정 파일만
 npx playwright test tests/eval-admin.spec.ts --workers=1
 
-# Redis OTP 클리어 (필요 시)
-docker exec eval-redis-1 redis-cli FLUSHALL
+# Redis OTP/rate limit 클리어 (필요 시)
+docker exec eval-redis-1 redis-cli -p 6379 KEYS "otp:*" | xargs docker exec eval-redis-1 redis-cli -p 6379 DEL
+docker exec eval-redis-1 redis-cli -p 6379 KEYS "admin:login:rate:*" | xargs docker exec eval-redis-1 redis-cli -p 6379 DEL
 ```
 
 ---
