@@ -1,12 +1,12 @@
 # 인수인계서 - QA 이슈 수정 및 기능 구현
 
 **최초 작성**: 2026-04-03  
-**최종 업데이트**: 2026-04-10 (2차)  
+**최종 업데이트**: 2026-04-11  
 **다음 작업자**: 개발팀
 
 ---
 
-## 1. 완료된 작업 (2026-04-10 기준)
+## 1. 완료된 작업 (2026-04-11 기준)
 
 ### 1.1 보안
 
@@ -114,19 +114,36 @@ docker exec eval-redis-1 redis-cli -p 6379 KEYS "admin:login:rate:*" | xargs doc
 
 ## 3. Docker 운영
 
-```bash
-# 앱 재빌드 후 재시작
-docker compose -f docker-compose.prod.yml build app
-docker compose -f docker-compose.prod.yml up -d --no-deps app
+현재 앱 컨테이너(`eval-app-1`)는 `docker run`으로 직접 관리 중 (docker-compose와 별개).
 
-# Redis 별도 시작 (--no-deps 사용 시 redis가 내려가므로 반드시 실행)
-docker compose -f docker-compose.prod.yml up -d redis
+```bash
+# 이미지 재빌드
+docker build -t eval-app-local .
+
+# 컨테이너 교체
+docker stop eval-app-1 && docker rm eval-app-1
+docker run -d \
+  --name eval-app-1 \
+  --network eval_default \
+  -p 3003:3000 \
+  -e NODE_ENV=production \
+  -e DATABASE_URL=postgresql://eval:eval_secret@eval-postgres:5432/eval_db \
+  -e REDIS_URL=redis://eval-redis-1:6379 \
+  -e AUTH_SECRET=change-this-to-a-random-secret-in-production \
+  -e S3_ENDPOINT=http://eval-minio:9000 \
+  -e S3_ACCESS_KEY=minioadmin \
+  -e S3_SECRET_KEY=minioadmin \
+  -e S3_BUCKET=eval-documents \
+  -e S3_REGION=us-east-1 \
+  -e OCTOMO_API_KEY=<키값> \
+  -e OCTOMO_TARGET_NUMBER=1666-3538 \
+  eval-app-local
 
 # 컨테이너 상태 확인
 docker ps --filter "name=eval"
 ```
 
-> **주의**: `--no-deps` 없이 prod compose `up -d` 실행 시 eval-postgres 삭제됨.
+> **주의**: `docker compose up` 실행 시 eval-postgres가 삭제될 수 있음.
 > postgres가 꺼지면: `docker compose up -d postgres` (메인 compose로 복구)
 
 ---
@@ -148,10 +165,16 @@ docker ps --filter "name=eval"
 ## 5. 환경 변수
 
 ```
-DATABASE_URL=postgresql://eval:eval_secret@postgres:5432/eval_db
-REDIS_URL=redis://redis:6379   # Docker 내부 (prod compose 기준)
-AUTH_SECRET=change-this-to-a-random-secret-in-production
-OCTOMO_API_KEY=...
+DATABASE_URL=postgresql://eval:eval_secret@eval-postgres:5432/eval_db
+REDIS_URL=redis://eval-redis-1:6379
+AUTH_SECRET=change-this-to-a-random-secret-in-production   # 운영 전 반드시 교체
+OCTOMO_API_KEY=<별도 보관>
+OCTOMO_TARGET_NUMBER=1666-3538
+S3_ENDPOINT=http://eval-minio:9000
+S3_ACCESS_KEY=minioadmin
+S3_SECRET_KEY=minioadmin
+S3_BUCKET=eval-documents
+S3_REGION=us-east-1
 ```
 </content>
 </invoke>
