@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { getAdminSession, requireRole } from '@/lib/auth/jwt'
+import { logAuditEvent } from '@/lib/audit'
 import type { FormSchema, FormItem } from '@/lib/form-template-schema'
 
 export async function POST(
@@ -247,20 +248,18 @@ export async function POST(
       })
 
       try {
-        await prisma.auditEvent.create({
-          data: {
-            actorType: 'admin',
-            actorId: session.id,
-            action: 'aggregate',
-            targetType: 'EvaluationSession',
-            targetId: resolvedParams.sessionId,
-            sessionId: resolvedParams.sessionId,
-            ipAddress:
-              request.headers.get('x-forwarded-for') ??
-              request.headers.get('x-real-ip') ??
-              null,
-            payloadJson: { aggregationRunId: aggregationRun.id },
-          },
+        await logAuditEvent({
+          actorType: 'admin',
+          actorId: session.id,
+          action: 'aggregate',
+          targetType: 'EvaluationSession',
+          targetId: resolvedParams.sessionId,
+          sessionId: resolvedParams.sessionId,
+          ipAddress:
+            request.headers.get('x-forwarded-for') ??
+            request.headers.get('x-real-ip') ??
+            null,
+          payloadJson: { aggregationRunId: aggregationRun.id },
         })
       } catch (e) {
         console.error('Audit log failed:', e)

@@ -15,7 +15,16 @@ const loginSchema = z.object({
 const ADMIN_SESSION_MAX_AGE = 60 * 60 * 8
 
 function getClientIp(request: Request) {
-  return request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? null
+  // x-real-ip: 신뢰 프록시(Nginx)가 $remote_addr로 설정 — 스푸핑 불가
+  const realIp = request.headers.get('x-real-ip')
+  if (realIp) return realIp.trim()
+  // x-forwarded-for: 마지막 IP(프록시가 추가한 값) 사용
+  const forwarded = request.headers.get('x-forwarded-for')
+  if (forwarded) {
+    const parts = forwarded.split(',')
+    return parts[parts.length - 1]?.trim() ?? null
+  }
+  return null
 }
 
 function getRequestId(request: Request) {
@@ -191,7 +200,7 @@ export async function POST(request: Request) {
     name: 'admin_session',
     value: token,
     httpOnly: true,
-    secure: request.url.startsWith('https://'),
+    secure: process.env.NODE_ENV === 'production' || request.headers.get('x-forwarded-proto') === 'https',
     sameSite: 'strict',
     path: '/',
     maxAge: ADMIN_SESSION_MAX_AGE,

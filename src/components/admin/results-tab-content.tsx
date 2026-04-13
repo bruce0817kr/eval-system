@@ -257,7 +257,7 @@ export function ResultsTabContent({ sessionId, sessionStatus }: ResultsTabConten
               <AlertDialogHeader>
                 <AlertDialogTitle>결과를 확정하시겠습니까?</AlertDialogTitle>
                 <AlertDialogDescription>
-                  확정 시 최종 집계가 재실행되고 순위가 저장됩니다.
+                  확정 시 현재 집계 결과가 확정되어 저장됩니다.
                   확정 후에는 재개방하지 않는 한 순위를 변경할 수 없습니다.
                 </AlertDialogDescription>
               </AlertDialogHeader>

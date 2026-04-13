@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { z } from 'zod'
 
 import { getAdminSession } from '@/lib/auth/jwt'
+import { logAuditEvent } from '@/lib/audit'
 import { prisma } from '@/lib/db'
 import { deleteFile, uploadFile } from '@/lib/storage'
 
@@ -50,7 +51,6 @@ export async function POST(
   }
 
   const allowedTypes = ['application/pdf', 'application/x-pdf']
-  const allowedExtensions = ['.pdf']
   const hasValidType = allowedTypes.includes(file.type) || file.name.toLowerCase().endsWith('.pdf')
 
   if (!hasValidType) {
@@ -86,19 +86,17 @@ export async function POST(
   })
 
   try {
-    await prisma.auditEvent.create({
-      data: {
-        actorType: 'admin',
-        actorId: admin.id,
-        action: 'create',
-        targetType: 'ApplicationDocument',
-        targetId: document.id,
-        sessionId,
-        ipAddress:
-          request.headers.get('x-forwarded-for') ??
-          request.headers.get('x-real-ip') ??
-          null,
-      },
+    await logAuditEvent({
+      actorType: 'admin',
+      actorId: admin.id,
+      action: 'create',
+      targetType: 'ApplicationDocument',
+      targetId: document.id,
+      sessionId,
+      ipAddress:
+        request.headers.get('x-forwarded-for') ??
+        request.headers.get('x-real-ip') ??
+        null,
     })
   } catch (e) {
     console.error('Audit log failed:', e)
@@ -174,6 +172,15 @@ export async function DELETE(
 
   const { sessionId, applicationId } = await params
 
+  // sessionId 경계 검증: applicationId가 해당 세션에 속하는지 확인
+  const appCheck = await prisma.application.findFirst({
+    where: { id: applicationId, sessionId },
+    select: { id: true },
+  })
+  if (!appCheck) {
+    return NextResponse.json({ error: '신청 정보를 찾을 수 없습니다' }, { status: 404 })
+  }
+
   const document = await prisma.applicationDocument.findFirst({
     where: { id: documentId, applicationId },
   })
@@ -192,19 +199,17 @@ export async function DELETE(
   }
 
   try {
-    await prisma.auditEvent.create({
-      data: {
-        actorType: 'admin',
-        actorId: admin.id,
-        action: 'delete',
-        targetType: 'ApplicationDocument',
-        targetId: documentId,
-        sessionId,
-        ipAddress:
-          request.headers.get('x-forwarded-for') ??
-          request.headers.get('x-real-ip') ??
-          null,
-      },
+    await logAuditEvent({
+      actorType: 'admin',
+      actorId: admin.id,
+      action: 'delete',
+      targetType: 'ApplicationDocument',
+      targetId: documentId,
+      sessionId,
+      ipAddress:
+        request.headers.get('x-forwarded-for') ??
+        request.headers.get('x-real-ip') ??
+        null,
     })
   } catch (e) {
     console.error('Audit log failed:', e)

@@ -3,6 +3,7 @@ import { ApplicationStatus, type Prisma } from '@/generated/prisma/client'
 import { z } from 'zod'
 
 import { getAdminSession } from '@/lib/auth/jwt'
+import { logAuditEvent } from '@/lib/audit'
 import { prisma } from '@/lib/db'
 import { canTransition, type EvaluationSessionStatus } from '@/lib/session'
 
@@ -228,20 +229,18 @@ export async function POST(
       targetStatus === 'reopened' ? 'reopen' : 'update'
 
     try {
-      await prisma.auditEvent.create({
-        data: {
-          actorType: 'admin',
-          actorId: adminSession.id,
-          action: auditAction,
-          targetType: 'EvaluationSession',
-          targetId: sessionId,
-          sessionId,
-          ipAddress:
-            request.headers.get('x-forwarded-for') ??
-            request.headers.get('x-real-ip') ??
-            null,
-          payloadJson: { targetStatus, reason: reason ?? null },
-        },
+      await logAuditEvent({
+        actorType: 'admin',
+        actorId: adminSession.id,
+        action: auditAction,
+        targetType: 'EvaluationSession',
+        targetId: sessionId,
+        sessionId,
+        ipAddress:
+          request.headers.get('x-forwarded-for') ??
+          request.headers.get('x-real-ip') ??
+          null,
+        payloadJson: { targetStatus, reason: reason ?? null },
       })
     } catch (e) {
       console.error('Audit log failed:', e)

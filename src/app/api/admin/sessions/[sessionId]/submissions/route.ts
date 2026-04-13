@@ -15,12 +15,17 @@ export async function GET(
   const { sessionId } = await params
   const { searchParams } = new URL(request.url)
   const memberId = searchParams.get('memberId') ?? undefined
+  const take = Math.max(
+    1,
+    Math.min(parseInt(searchParams.get('take') ?? '500', 10) || 500, 1000),
+  )
 
   const submissions = await prisma.evaluationSubmission.findMany({
     where: {
       sessionId,
       ...(memberId ? { committeeMemberId: memberId } : {}),
     },
+    take,
     include: {
       application: {
         include: {

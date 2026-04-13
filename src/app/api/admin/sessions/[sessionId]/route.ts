@@ -40,33 +40,45 @@ export async function GET(
   }
 
   const { sessionId } = await context.params
-  const session = await prisma.evaluationSession.findUnique({
-    where: { id: sessionId },
-    include: {
-      formDefinition: true,
-      applications: {
-        include: {
-          company: true,
+
+  const [session, submissionCounts] = await Promise.all([
+    prisma.evaluationSession.findUnique({
+      where: { id: sessionId },
+      include: {
+        formDefinition: true,
+        applications: {
+          include: {
+            company: true,
+          },
+          orderBy: [{ evaluationOrder: 'asc' }, { createdAt: 'asc' }],
         },
-        orderBy: [{ evaluationOrder: 'asc' }, { createdAt: 'asc' }],
-      },
-      committeeMembers: {
-        include: {
-          committeeMember: true,
+        committeeMembers: {
+          include: {
+            committeeMember: true,
+          },
+          orderBy: { assignedAt: 'asc' },
         },
-        orderBy: { assignedAt: 'asc' },
-      },
-      resultSnapshots: {
-        orderBy: { rank: 'asc' },
-      },
-      _count: {
-        select: {
-          applications: true,
-          committeeMembers: true,
+        resultSnapshots: {
+          orderBy: { rank: 'asc' },
+        },
+        _count: {
+          select: {
+            applications: true,
+            committeeMembers: true,
+          },
         },
       },
-    },
-  })
+    }),
+    // 위원별 제출 완료(submitted/signed) 카운트
+    prisma.evaluationSubmission.groupBy({
+      by: ['committeeMemberId'],
+      where: {
+        sessionId,
+        submissionState: { in: ['submitted', 'signed'] },
+      },
+      _count: { id: true },
+    }),
+  ])
 
   if (!session) {
     return NextResponse.json(
@@ -74,16 +86,6 @@ export async function GET(
       { status: 404 },
     )
   }
-
-  // 위원별 제출 완료(submitted/signed) 카운트
-  const submissionCounts = await prisma.evaluationSubmission.groupBy({
-    by: ['committeeMemberId'],
-    where: {
-      sessionId,
-      submissionState: { in: ['submitted', 'signed'] },
-    },
-    _count: { id: true },
-  })
 
   const countMap: Record<string, number> = {}
   for (const s of submissionCounts) {

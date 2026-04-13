@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { z } from 'zod'
 
 import { getAdminSession } from '@/lib/auth/jwt'
+import { logAuditEvent } from '@/lib/audit'
 import { prisma } from '@/lib/db'
 
 const patchSchema = z.object({
@@ -98,20 +99,18 @@ export async function PATCH(
   })
 
   try {
-    await prisma.auditEvent.create({
-      data: {
-        actorType: 'admin',
-        actorId: admin.id,
-        action: 'update',
-        targetType: 'Application',
-        targetId: applicationId,
-        sessionId,
-        ipAddress:
-          request.headers.get('x-forwarded-for') ??
-          request.headers.get('x-real-ip') ??
-          null,
-        payloadJson: parsed.data,
-      },
+    await logAuditEvent({
+      actorType: 'admin',
+      actorId: admin.id,
+      action: 'update',
+      targetType: 'Application',
+      targetId: applicationId,
+      sessionId,
+      ipAddress:
+        request.headers.get('x-forwarded-for') ??
+        request.headers.get('x-real-ip') ??
+        null,
+      payloadJson: parsed.data,
     })
   } catch (e) {
     console.error('Audit log failed:', e)

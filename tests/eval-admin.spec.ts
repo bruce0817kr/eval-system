@@ -24,6 +24,16 @@ test.describe('관리자 로그인', () => {
     await clearAdminRateLimit()
   })
 
+  test('잘못된 비밀번호 → 에러 메시지 표시', async ({ page }) => {
+    await page.goto('/admin/login')
+    await page.fill('input[type="email"]', ADMIN_EMAIL)
+    await page.fill('input[type="password"]', 'WrongPassword!!1')
+    await page.click('button[type="submit"]')
+    await expect(
+      page.locator('text=이메일 또는 비밀번호가 올바르지 않습니다'),
+    ).toBeVisible({ timeout: 5000 })
+  })
+
   test('관리자 로그인 페이지가 렌더링된다', async ({ page }) => {
     await page.goto('/admin/login')
     await expect(page.locator('text=관리자 로그인')).toBeVisible()

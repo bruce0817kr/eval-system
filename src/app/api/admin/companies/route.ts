@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { z } from 'zod'
 
 import { getAdminSession } from '@/lib/auth/jwt'
+import { logAuditEvent } from '@/lib/audit'
 import { prisma } from '@/lib/db'
 
 const listQuerySchema = z.object({
@@ -112,18 +113,16 @@ export async function POST(request: Request) {
   })
 
   try {
-    await prisma.auditEvent.create({
-      data: {
-        actorType: 'admin',
-        actorId: admin.id,
-        action: 'create',
-        targetType: 'Company',
-        targetId: company.id,
-        ipAddress:
-          request.headers.get('x-forwarded-for') ??
-          request.headers.get('x-real-ip') ??
-          null,
-      },
+    await logAuditEvent({
+      actorType: 'admin',
+      actorId: admin.id,
+      action: 'create',
+      targetType: 'Company',
+      targetId: company.id,
+      ipAddress:
+        request.headers.get('x-forwarded-for') ??
+        request.headers.get('x-real-ip') ??
+        null,
     })
   } catch (e) {
     console.error('Audit log failed:', e)

@@ -1,6 +1,7 @@
 type RedisLike = {
   incr(key: string): Promise<number>
   expire(key: string, seconds: number): Promise<number>
+  del(key: string): Promise<number>
 }
 
 type RedisModule = {
@@ -109,3 +110,4 @@ export async function rateLimitAdminLogin(
 
   return inMemoryRateLimit(ip)
 }
+

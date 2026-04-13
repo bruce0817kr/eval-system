@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { z } from 'zod'
 
 import { getAdminSession } from '@/lib/auth/jwt'
+import { logAuditEvent } from '@/lib/audit'
 import { hashPassword, verifyPassword } from '@/lib/auth/password'
 import { prisma } from '@/lib/db'
 
@@ -57,19 +58,17 @@ export async function POST(request: Request) {
   })
 
   try {
-    await prisma.auditEvent.create({
-      data: {
-        actorType: 'admin',
-        actorId: admin.id,
-        action: 'update',
-        targetType: 'AdminUser',
-        targetId: admin.id,
-        ipAddress:
-          request.headers.get('x-forwarded-for') ??
-          request.headers.get('x-real-ip') ??
-          null,
-        payloadJson: { field: 'password' },
-      },
+    await logAuditEvent({
+      actorType: 'admin',
+      actorId: admin.id,
+      action: 'update',
+      targetType: 'AdminUser',
+      targetId: admin.id,
+      ipAddress:
+        request.headers.get('x-forwarded-for') ??
+        request.headers.get('x-real-ip') ??
+        null,
+      payloadJson: { field: 'password' },
     })
   } catch (e) {
     console.error('Audit log failed:', e)

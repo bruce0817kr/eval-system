@@ -33,7 +33,14 @@ function formatPhone(phone: string) {
 }
 
 function getClientIp(request: Request) {
-  return request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? null
+  const realIp = request.headers.get('x-real-ip')
+  if (realIp) return realIp.trim()
+  const forwarded = request.headers.get('x-forwarded-for')
+  if (forwarded) {
+    const parts = forwarded.split(',')
+    return parts[parts.length - 1]?.trim() ?? null
+  }
+  return null
 }
 
 function getRequestId(request: Request) {
@@ -121,7 +128,7 @@ export async function POST(request: Request) {
 
   // Prisma WASM 버그 우회: raw pg 직접 사용 (name + phone SQL 파라미터로 전달)
   const { rows } = await pgPool.query<{ id: string; name: string; phone: string }>(
-    'SELECT id, name, phone FROM committee_member WHERE name = $1 AND phone = ANY($2::text[]) LIMIT 1',
+    'SELECT id, name, phone FROM committee_member WHERE name = $1 AND phone = ANY($2::text[]) AND is_active = TRUE LIMIT 1',
     [name, [normalizedPhone, formatPhone(normalizedPhone)]],
   )
   const member = rows[0] ?? null
@@ -199,7 +206,7 @@ export async function POST(request: Request) {
     name: 'eval_session',
     value: token,
     httpOnly: true,
-    secure: request.url.startsWith('https://'),
+    secure: process.env.NODE_ENV === 'production' || request.headers.get('x-forwarded-proto') === 'https',
     sameSite: 'strict',
     path: '/',
     maxAge: COMMITTEE_SESSION_MAX_AGE,
