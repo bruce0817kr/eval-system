@@ -14,6 +14,13 @@ import {
 } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import {
   Table,
   TableBody,
   TableCell,
@@ -34,31 +41,45 @@ type Delivery = {
   deliveredAt: string | null
 }
 
+function isStatusFilter(value: string): value is "all" | "pending" | "delivered" | "failed" {
+  return value === "all" || value === "pending" || value === "delivered" || value === "failed"
+}
+
 export default function IntegrationWebhooksPage() {
   const [deliveries, setDeliveries] = useState<Delivery[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [replayingEventId, setReplayingEventId] = useState<string | null>(null)
+  const [statusFilter, setStatusFilter] = useState<"all" | "pending" | "delivered" | "failed">("all")
+  const [page, setPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
 
   const loadDeliveries = useCallback(async () => {
     setIsLoading(true)
     setError(null)
 
     try {
-      const response = await fetch("/api/admin/integration/webhooks")
+      const params = new URLSearchParams({
+        page: String(page),
+        pageSize: "20",
+      })
+      if (statusFilter !== "all") params.set("status", statusFilter)
+
+      const response = await fetch(`/api/admin/integration/webhooks?${params.toString()}`)
       if (!response.ok) {
         const data = (await response.json().catch(() => null)) as { error?: string } | null
         throw new Error(data?.error ?? "Failed to load webhook deliveries")
       }
 
-      const data = (await response.json()) as { deliveries: Delivery[] }
+      const data = (await response.json()) as { deliveries: Delivery[]; totalPages: number }
       setDeliveries(data.deliveries)
+      setTotalPages(data.totalPages)
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : "Failed to load webhook deliveries")
     } finally {
       setIsLoading(false)
     }
-  }, [])
+  }, [page, statusFilter])
 
   useEffect(() => {
     void loadDeliveries()
@@ -108,6 +129,51 @@ export default function IntegrationWebhooksPage() {
           <RefreshCcwIcon className="size-4" />
           Refresh
         </Button>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2">
+        <Select
+          value={statusFilter}
+          onValueChange={(value) => {
+            if (!value) return
+            if (!isStatusFilter(value)) return
+            setStatusFilter(value)
+            setPage(1)
+          }}
+        >
+          <SelectTrigger aria-label="Status filter" className="w-44">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All statuses</SelectItem>
+            <SelectItem value="pending">pending</SelectItem>
+            <SelectItem value="delivered">delivered</SelectItem>
+            <SelectItem value="failed">failed</SelectItem>
+          </SelectContent>
+        </Select>
+        <div className="ml-auto flex items-center gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={page <= 1}
+            onClick={() => setPage((current) => Math.max(1, current - 1))}
+          >
+            Previous
+          </Button>
+          <span className="text-sm text-muted-foreground">
+            Page {page} / {totalPages}
+          </span>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={page >= totalPages}
+            onClick={() => setPage((current) => current + 1)}
+          >
+            Next
+          </Button>
+        </div>
       </div>
 
       {error ? (

@@ -539,11 +539,17 @@ test('simulates 5 evaluators scoring 10 companies and verifies evaluator documen
     await expect.poll(() => webhookReceiver.deliveries.length).toBe(3)
     expect(webhookReceiver.deliveries[2].eventId).toBe(webhookReceiver.deliveries[1].eventId)
 
-    const adminDeliveries = await request.get('/api/admin/integration/webhooks')
+    const adminDeliveries = await request.get('/api/admin/integration/webhooks?status=delivered&page=1&pageSize=5')
     expect(adminDeliveries.ok()).toBeTruthy()
     const adminDeliveriesBody = (await adminDeliveries.json()) as {
+      page: number
+      pageSize: number
+      total: number
       deliveries: Array<{ eventId: string; status: string; attempts: number }>
     }
+    expect(adminDeliveriesBody.page).toBe(1)
+    expect(adminDeliveriesBody.pageSize).toBe(5)
+    expect(adminDeliveriesBody.total).toBeGreaterThanOrEqual(1)
     expect(adminDeliveriesBody.deliveries[0]).toEqual(
       expect.objectContaining({
         eventId: webhookReceiver.deliveries[1].eventId,
@@ -565,6 +571,8 @@ test('simulates 5 evaluators scoring 10 companies and verifies evaluator documen
     )
     await page.goto('/admin/integration/webhooks')
     await expect(page.getByRole('heading', { name: 'Integration Webhooks' })).toBeVisible()
+    await expect(page.getByRole('link', { name: /Integration Webhooks/ })).toBeVisible()
+    await expect(page.getByLabel('Status filter')).toBeVisible()
     await expect(page.getByText(webhookReceiver.deliveries[1].eventId!)).toBeVisible()
     await expect(page.getByText('delivered').first()).toBeVisible()
   } finally {

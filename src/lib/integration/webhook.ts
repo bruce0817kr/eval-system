@@ -252,3 +252,77 @@ export async function listIntegrationWebhookDeliveries(limit = 50) {
     deliveredAt: row.delivered_at?.toISOString() ?? null,
   }))
 }
+
+export async function listIntegrationWebhookDeliveriesPage(input: {
+  page: number
+  pageSize: number
+  status?: string | null
+}) {
+  await ensureDeliveryTable()
+
+  const offset = (input.page - 1) * input.pageSize
+  const rows = input.status
+    ? await prisma.$queryRaw<
+        Array<{
+          event_id: string
+          event_type: string
+          url: string
+          status: string
+          attempts: number
+          last_status: number | null
+          last_error: string | null
+          created_at: Date
+          updated_at: Date
+          delivered_at: Date | null
+          total_count: bigint
+        }>
+      >`
+        SELECT event_id, event_type, url, status, attempts, last_status, last_error,
+               created_at, updated_at, delivered_at, COUNT(*) OVER() AS total_count
+        FROM integration_webhook_delivery
+        WHERE status = ${input.status}
+        ORDER BY updated_at DESC
+        LIMIT ${input.pageSize}
+        OFFSET ${offset}
+      `
+    : await prisma.$queryRaw<
+        Array<{
+          event_id: string
+          event_type: string
+          url: string
+          status: string
+          attempts: number
+          last_status: number | null
+          last_error: string | null
+          created_at: Date
+          updated_at: Date
+          delivered_at: Date | null
+          total_count: bigint
+        }>
+      >`
+        SELECT event_id, event_type, url, status, attempts, last_status, last_error,
+               created_at, updated_at, delivered_at, COUNT(*) OVER() AS total_count
+        FROM integration_webhook_delivery
+        ORDER BY updated_at DESC
+        LIMIT ${input.pageSize}
+        OFFSET ${offset}
+      `
+
+  const deliveries = rows.map((row) => ({
+    eventId: row.event_id,
+    eventType: row.event_type,
+    url: row.url,
+    status: row.status,
+    attempts: row.attempts,
+    lastStatus: row.last_status,
+    lastError: row.last_error,
+    createdAt: row.created_at.toISOString(),
+    updatedAt: row.updated_at.toISOString(),
+    deliveredAt: row.delivered_at?.toISOString() ?? null,
+  }))
+
+  return {
+    deliveries,
+    total: Number(rows[0]?.total_count ?? 0),
+  }
+}

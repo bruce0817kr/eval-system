@@ -9,6 +9,7 @@ import {
   FileText,
   LayoutDashboard,
   LogOut,
+  RadioTower,
   Settings,
   Shield,
   type LucideIcon,
@@ -69,6 +70,11 @@ const adminNavItems: AdminNavItem[] = [
     title: "감사 로그",
     href: "/admin/audit-log",
     icon: Shield,
+  },
+  {
+    title: "Integration Webhooks",
+    href: "/admin/integration/webhooks",
+    icon: RadioTower,
   },
   {
     title: "설정",

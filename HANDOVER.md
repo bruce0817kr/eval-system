@@ -311,3 +311,21 @@ S3_REGION=us-east-1
   - `npx playwright test tests/integration-api.spec.ts tests/eval-api-coverage.spec.ts tests/eval-full-simulation.spec.ts --workers=1` -> 21 passed
   - `npm run lint` -> success
   - `npm run build` -> success
+
+### 2026-04-16 webhook 운영 하드닝 후속
+- 관리자 메뉴 연결
+  - `/admin/integration/webhooks`를 관리자 사이드바에 추가
+- delivery 목록 필터/페이지네이션 추가
+  - `GET /api/admin/integration/webhooks?page=&pageSize=&status=`
+  - `status`: `pending | delivered | failed`
+  - 화면에 Status filter, Previous/Next 표시
+- delivery table 정식 스키마 기록
+  - `prisma/schema.prisma`에 `IntegrationWebhookDelivery` 모델 추가
+  - `prisma/migrations/202604160001_add_integration_webhook_delivery/migration.sql` 추가
+- PDF viewer warning 정리
+  - `react-pdf/dist/Page/TextLayer.css` import 추가
+- 검증
+  - `npx playwright test tests/eval-full-simulation.spec.ts --workers=1` -> 1 passed
+  - `npx playwright test tests/integration-api.spec.ts tests/eval-api-coverage.spec.ts tests/eval-full-simulation.spec.ts --workers=1` -> 21 passed
+  - `npm run lint` -> success
+  - `npm run build` -> success
