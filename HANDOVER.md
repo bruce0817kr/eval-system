@@ -292,3 +292,22 @@ S3_REGION=us-east-1
   - `npx playwright test tests/integration-api.spec.ts tests/eval-api-coverage.spec.ts tests/eval-full-simulation.spec.ts --workers=1` -> 21 passed
   - `npm run lint` -> success
   - `npm run build` -> success
+
+### 2026-04-16 webhook delivery 관리자 화면/API 추가
+- 관리자 API
+  - `GET /api/admin/integration/webhooks`
+    - delivery log 목록 조회
+    - operator 이상 권한 필요
+  - `POST /api/admin/integration/webhooks/[eventId]/replay`
+    - 관리자 권한으로 webhook 재전송
+- 관리자 화면
+  - `/admin/integration/webhooks`
+  - event id, 상태, attempts, last response, updated time 표시
+  - Replay 버튼 제공
+- delivery log helper
+  - `listIntegrationWebhookDeliveries()` 추가
+- 검증
+  - `npx playwright test tests/eval-full-simulation.spec.ts --workers=1` -> 1 passed
+  - `npx playwright test tests/integration-api.spec.ts tests/eval-api-coverage.spec.ts tests/eval-full-simulation.spec.ts --workers=1` -> 21 passed
+  - `npm run lint` -> success
+  - `npm run build` -> success

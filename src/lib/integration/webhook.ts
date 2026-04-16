@@ -214,3 +214,41 @@ export async function replayIntegrationWebhook(eventId: string) {
   })
   return true
 }
+
+export async function listIntegrationWebhookDeliveries(limit = 50) {
+  await ensureDeliveryTable()
+
+  const rows = await prisma.$queryRaw<
+    Array<{
+      event_id: string
+      event_type: string
+      url: string
+      status: string
+      attempts: number
+      last_status: number | null
+      last_error: string | null
+      created_at: Date
+      updated_at: Date
+      delivered_at: Date | null
+    }>
+  >`
+    SELECT event_id, event_type, url, status, attempts, last_status, last_error,
+           created_at, updated_at, delivered_at
+    FROM integration_webhook_delivery
+    ORDER BY updated_at DESC
+    LIMIT ${limit}
+  `
+
+  return rows.map((row) => ({
+    eventId: row.event_id,
+    eventType: row.event_type,
+    url: row.url,
+    status: row.status,
+    attempts: row.attempts,
+    lastStatus: row.last_status,
+    lastError: row.last_error,
+    createdAt: row.created_at.toISOString(),
+    updatedAt: row.updated_at.toISOString(),
+    deliveredAt: row.delivered_at?.toISOString() ?? null,
+  }))
+}
