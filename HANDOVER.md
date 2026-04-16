@@ -348,3 +348,22 @@ S3_REGION=us-east-1
   - `npm run lint` -> success
   - `npm run build` -> success
   - `npm run db:generate` -> success
+
+### 2026-04-16 integration 운영 문서/명세 검증 추가
+- fresh DB migration 검증
+  - 임시 DB `eval_migrate_verify` 생성
+  - `DATABASE_URL=postgresql://eval:eval_secret@localhost:15432/eval_migrate_verify npm run db:migrate:deploy` 성공
+  - `integration_webhook_delivery` 생성 및 `_prisma_migrations` 기록 확인
+  - 검증 후 임시 DB 삭제
+- OpenAPI 명세 체크 스크립트 추가
+  - `npm run api:spec:check`
+  - `scripts/validate-openapi.mjs`
+  - 주요 integration endpoint/schema/webhook/header 존재 여부 검사
+- 연동 예시 문서 추가
+  - `docs/api/integration-examples.md`
+  - 세션 upsert, 신청기업 upsert, PDF 업로드, 결과 조회, webhook replay, finalized webhook payload, 배포 체크리스트 포함
+- 검증
+  - `npm run api:spec:check` -> success
+  - `npx playwright test tests/integration-api.spec.ts tests/eval-api-coverage.spec.ts tests/eval-full-simulation.spec.ts --workers=1` -> 21 passed
+  - `npm run lint` -> success
+  - `npm run build` -> success
