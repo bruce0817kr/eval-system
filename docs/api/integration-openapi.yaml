@@ -74,6 +74,31 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/SessionNotFound'
+  /api/v1/integration/applications/{externalApplicationId}/documents:
+    post:
+      summary: Upload a PDF document for an externally synchronized application
+      operationId: uploadIntegrationApplicationDocument
+      parameters:
+        - $ref: '#/components/parameters/ExternalApplicationId'
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/DocumentUploadRequest'
+      responses:
+        '201':
+          description: Document uploaded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentUploadResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/ApplicationNotFound'
 components:
   securitySchemes:
     bearerAuth:
@@ -86,6 +111,14 @@ components:
       in: path
       required: true
       description: Stable business-management system session, notice, or project ID.
+      schema:
+        type: string
+        minLength: 1
+    ExternalApplicationId:
+      name: externalApplicationId
+      in: path
+      required: true
+      description: Stable business-management system application ID.
       schema:
         type: string
         minLength: 1
@@ -114,6 +147,15 @@ components:
           example:
             code: SESSION_NOT_FOUND
             message: Integration session not found
+    ApplicationNotFound:
+      description: External application was not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            code: APPLICATION_NOT_FOUND
+            message: Integration application not found
   schemas:
     ErrorResponse:
       type: object
@@ -318,3 +360,41 @@ components:
         status:
           type: string
           enum: [registered, evaluating, completed, excluded]
+    DocumentUploadRequest:
+      type: object
+      required: [file]
+      properties:
+        file:
+          type: string
+          format: binary
+          description: PDF file to attach to the application.
+        docType:
+          type: string
+          enum: [business_plan, supplementary]
+          default: business_plan
+    DocumentUploadResponse:
+      type: object
+      required: [externalApplicationId, document]
+      properties:
+        externalApplicationId:
+          type: string
+        document:
+          $ref: '#/components/schemas/DocumentItem'
+    DocumentItem:
+      type: object
+      required: [id, docType, originalFilename, mimeType, fileSize, uploadedAt]
+      properties:
+        id:
+          type: string
+        docType:
+          type: string
+          enum: [business_plan, supplementary]
+        originalFilename:
+          type: string
+        mimeType:
+          type: string
+        fileSize:
+          type: integer
+        uploadedAt:
+          type: string
+          format: date-time

@@ -85,6 +85,42 @@ test.describe('business-management integration REST API', () => {
       }),
     )
 
+    const documentResponse = await request.post(
+      `/api/v1/integration/applications/${EXTERNAL_APPLICATION_ID}/documents`,
+      {
+        headers: { Authorization: AUTH_HEADER },
+        multipart: {
+          file: {
+            name: 'external-business-plan.pdf',
+            mimeType: 'application/pdf',
+            buffer: Buffer.from('%PDF-1.4\n% external integration test pdf\n', 'utf8'),
+          },
+          docType: 'business_plan',
+        },
+      },
+    )
+
+    expect(documentResponse.status()).toBe(201)
+    const documentBody = (await documentResponse.json()) as {
+      externalApplicationId: string
+      document: {
+        id: string
+        originalFilename: string
+        mimeType: string
+        fileSize: number
+      }
+    }
+    expect(documentBody).toEqual(
+      expect.objectContaining({
+        externalApplicationId: EXTERNAL_APPLICATION_ID,
+        document: expect.objectContaining({
+          originalFilename: 'external-business-plan.pdf',
+          mimeType: 'application/pdf',
+        }),
+      }),
+    )
+    expect(documentBody.document.fileSize).toBeGreaterThan(0)
+
     const resultsResponse = await request.get(
       `/api/v1/integration/sessions/${EXTERNAL_SESSION_ID}/results`,
       {

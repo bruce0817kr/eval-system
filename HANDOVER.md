@@ -228,3 +228,17 @@ S3_REGION=us-east-1
   - `npm run lint` -> success
   - `npx playwright test tests/eval-full-simulation.spec.ts tests/integration-api.spec.ts tests/eval-api-coverage.spec.ts --workers=1` -> 21 passed
   - `npm run build` -> success
+
+### 2026-04-16 문서 업로드 연동 API 추가
+- 추가 endpoint
+  - `POST /api/v1/integration/applications/[externalApplicationId]/documents`
+  - 인증: `Authorization: Bearer <INTEGRATION_API_KEY>`
+  - 요청: `multipart/form-data`, `file` 필수, `docType=business_plan|supplementary`
+  - 현재 PDF만 허용
+- OpenAPI 갱신
+  - `docs/api/integration-openapi.yaml`
+  - `DocumentUploadRequest`, `DocumentUploadResponse`, `DocumentItem`, `ExternalApplicationId` 추가
+- 검증
+  - `npx playwright test tests/integration-api.spec.ts tests/eval-api-coverage.spec.ts tests/eval-full-simulation.spec.ts --workers=1` -> 21 passed
+  - `npm run lint` -> success
+  - `npm run build` -> success
