@@ -5,6 +5,7 @@ import { z } from 'zod'
 import { getAdminSession } from '@/lib/auth/jwt'
 import { logAuditEvent } from '@/lib/audit'
 import { prisma } from '@/lib/db'
+import { notifyIntegrationSessionFinalized } from '@/lib/integration/webhook'
 import { canTransition, type EvaluationSessionStatus } from '@/lib/session'
 
 const statusBodySchema = z.object({
@@ -244,6 +245,10 @@ export async function POST(
       })
     } catch (e) {
       console.error('Audit log failed:', e)
+    }
+
+    if (targetStatus === 'finalized') {
+      await notifyIntegrationSessionFinalized(sessionId)
     }
 
     return NextResponse.json(updated, { status: 200 })

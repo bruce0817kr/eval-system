@@ -2,6 +2,7 @@ import { expect, test } from '@playwright/test'
 import { PutObjectCommand, S3Client } from '@aws-sdk/client-s3'
 import { Client } from 'pg'
 import { execSync } from 'child_process'
+import { createServer, type IncomingMessage } from 'http'
 
 const ADMIN_EMAIL = 'testadmin@test.com'
 const ADMIN_PASSWORD = 'TestAdmin123!'
@@ -401,6 +402,33 @@ function clearSimulationOtpState() {
   }
 }
 
+async function startWebhookReceiver() {
+  const received: unknown[] = []
+  const server = createServer((request: IncomingMessage, response) => {
+    if (request.method !== 'POST' || request.url !== '/integration-webhook') {
+      response.writeHead(404)
+      response.end()
+      return
+    }
+
+    const chunks: Buffer[] = []
+    request.on('data', (chunk: Buffer) => chunks.push(chunk))
+    request.on('end', () => {
+      const body = Buffer.concat(chunks).toString('utf8')
+      received.push(JSON.parse(body))
+      response.writeHead(200, { 'Content-Type': 'application/json' })
+      response.end(JSON.stringify({ ok: true }))
+    })
+  })
+
+  await new Promise<void>((resolve) => server.listen(3999, '127.0.0.1', resolve))
+
+  return {
+    received,
+    close: () => new Promise<void>((resolve) => server.close(() => resolve())),
+  }
+}
+
 test('simulates 5 evaluators scoring 10 companies and verifies evaluator document UI plus top 3 selection', async ({
   page,
   request,
@@ -454,10 +482,27 @@ test('simulates 5 evaluators scoring 10 companies and verifies evaluator documen
   ])
   expect(aggregateBody.results.every((result) => result.error === null)).toBeTruthy()
 
-  const finalize = await request.post(`/api/admin/sessions/${SESSION_ID}/status`, {
-    data: { status: 'finalized', reason: '시뮬레이션 최종 선정 확정' },
-  })
-  expect(finalize.ok()).toBeTruthy()
+  const webhookReceiver = await startWebhookReceiver()
+  try {
+    const finalize = await request.post(`/api/admin/sessions/${SESSION_ID}/status`, {
+      data: { status: 'finalized', reason: '시뮬레이션 최종 선정 확정' },
+    })
+    expect(finalize.ok()).toBeTruthy()
+    await expect.poll(() => webhookReceiver.received.length).toBe(1)
+    expect(webhookReceiver.received[0]).toEqual(
+      expect.objectContaining({
+        event: 'evaluation.finalized',
+        sessionId: SESSION_ID,
+        selectedApplications: [
+          expect.objectContaining({ companyName: COMPANIES[0].name, rank: 1 }),
+          expect.objectContaining({ companyName: COMPANIES[1].name, rank: 2 }),
+          expect.objectContaining({ companyName: COMPANIES[2].name, rank: 3 }),
+        ],
+      }),
+    )
+  } finally {
+    await webhookReceiver.close()
+  }
 
   const pdfExport = await request.get(`/api/admin/sessions/${SESSION_ID}/results/pdf`)
   expect(pdfExport.ok()).toBeTruthy()

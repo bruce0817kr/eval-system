@@ -8,6 +8,21 @@ servers:
     description: Local development
 security:
   - bearerAuth: []
+webhooks:
+  evaluationFinalized:
+    post:
+      summary: Outbound webhook sent when an evaluation session is finalized
+      description: Sent to `INTEGRATION_WEBHOOK_URL` after a session is finalized.
+      operationId: receiveEvaluationFinalizedWebhook
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EvaluationFinalizedWebhook'
+      responses:
+        '200':
+          description: Webhook accepted by the business-management system
 paths:
   /api/v1/integration/sessions/{externalSessionId}:
     put:
@@ -80,6 +95,7 @@ paths:
       operationId: uploadIntegrationApplicationDocument
       parameters:
         - $ref: '#/components/parameters/ExternalApplicationId'
+        - $ref: '#/components/parameters/IdempotencyKey'
       requestBody:
         required: true
         content:
@@ -119,6 +135,14 @@ components:
       in: path
       required: true
       description: Stable business-management system application ID.
+      schema:
+        type: string
+        minLength: 1
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: false
+      description: Optional retry key. Reusing the same key for the same application document upload returns the original document instead of creating a duplicate.
       schema:
         type: string
         minLength: 1
@@ -398,3 +422,37 @@ components:
         uploadedAt:
           type: string
           format: date-time
+    EvaluationFinalizedWebhook:
+      type: object
+      required: [event, sessionId, title, status, finalizedAt, selectedApplications]
+      properties:
+        event:
+          type: string
+          const: evaluation.finalized
+        sessionId:
+          type: string
+        title:
+          type: string
+        status:
+          type: string
+          const: finalized
+        finalizedAt:
+          type: string
+          format: date-time
+        selectedApplications:
+          type: array
+          items:
+            $ref: '#/components/schemas/SelectedApplication'
+    SelectedApplication:
+      type: object
+      required: [applicationId, companyName, rank, finalScore]
+      properties:
+        applicationId:
+          type: string
+        companyName:
+          type: string
+        rank:
+          type: integer
+          minimum: 1
+        finalScore:
+          type: number

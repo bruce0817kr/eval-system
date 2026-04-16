@@ -23,6 +23,7 @@ test.describe('business-management integration REST API', () => {
   test('upserts a session and applications, then exposes integration results', async ({
     request,
   }) => {
+    const documentIdempotencyKey = `document-upload-restapi-${Date.now()}`
     const sessionResponse = await request.put(
       `/api/v1/integration/sessions/${EXTERNAL_SESSION_ID}`,
       {
@@ -88,7 +89,10 @@ test.describe('business-management integration REST API', () => {
     const documentResponse = await request.post(
       `/api/v1/integration/applications/${EXTERNAL_APPLICATION_ID}/documents`,
       {
-        headers: { Authorization: AUTH_HEADER },
+        headers: {
+          Authorization: AUTH_HEADER,
+          'Idempotency-Key': documentIdempotencyKey,
+        },
         multipart: {
           file: {
             name: 'external-business-plan.pdf',
@@ -120,6 +124,27 @@ test.describe('business-management integration REST API', () => {
       }),
     )
     expect(documentBody.document.fileSize).toBeGreaterThan(0)
+
+    const duplicateDocumentResponse = await request.post(
+      `/api/v1/integration/applications/${EXTERNAL_APPLICATION_ID}/documents`,
+      {
+        headers: {
+          Authorization: AUTH_HEADER,
+          'Idempotency-Key': documentIdempotencyKey,
+        },
+        multipart: {
+          file: {
+            name: 'external-business-plan.pdf',
+            mimeType: 'application/pdf',
+            buffer: Buffer.from('%PDF-1.4\n% external integration test pdf retry\n', 'utf8'),
+          },
+          docType: 'business_plan',
+        },
+      },
+    )
+    expect(duplicateDocumentResponse.status()).toBe(200)
+    const duplicateDocumentBody = (await duplicateDocumentResponse.json()) as typeof documentBody
+    expect(duplicateDocumentBody.document.id).toBe(documentBody.document.id)
 
     const resultsResponse = await request.get(
       `/api/v1/integration/sessions/${EXTERNAL_SESSION_ID}/results`,

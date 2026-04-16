@@ -19,6 +19,11 @@ function sanitizeFilename(filename: string) {
   return filename.replace(/[^a-zA-Z0-9._-]/g, '_')
 }
 
+function idempotencyMarker(request: Request) {
+  const value = request.headers.get('idempotency-key')?.trim()
+  return value ? `idempotency:${value}` : null
+}
+
 export async function POST(request: Request, context: RouteContext) {
   if (!verifyIntegrationRequest(request)) {
     return integrationUnauthorized()
@@ -32,6 +37,30 @@ export async function POST(request: Request, context: RouteContext) {
 
   if (!application) {
     return integrationError('APPLICATION_NOT_FOUND', 'Integration application not found', 404)
+  }
+
+  const marker = idempotencyMarker(request)
+  if (marker) {
+    const existingDocument = await prisma.applicationDocument.findFirst({
+      where: {
+        applicationId: application.id,
+        sha256: marker,
+      },
+    })
+
+    if (existingDocument) {
+      return NextResponse.json({
+        externalApplicationId: application.id,
+        document: {
+          id: existingDocument.id,
+          docType: existingDocument.docType,
+          originalFilename: existingDocument.originalFilename,
+          mimeType: existingDocument.mimeType,
+          fileSize: existingDocument.fileSize,
+          uploadedAt: existingDocument.uploadedAt.toISOString(),
+        },
+      })
+    }
   }
 
   let formData: FormData
@@ -73,6 +102,7 @@ export async function POST(request: Request, context: RouteContext) {
       originalFilename: file.name,
       mimeType: file.type || 'application/pdf',
       fileSize: buffer.length,
+      sha256: marker,
     },
   })
 

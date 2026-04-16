@@ -242,3 +242,20 @@ S3_REGION=us-east-1
   - `npx playwright test tests/integration-api.spec.ts tests/eval-api-coverage.spec.ts tests/eval-full-simulation.spec.ts --workers=1` -> 21 passed
   - `npm run lint` -> success
   - `npm run build` -> success
+
+### 2026-04-16 idempotency/webhook 보강
+- 문서 업로드 연동 API 재시도 안전성 추가
+  - `Idempotency-Key` 헤더 지원
+  - 같은 application + key 재요청 시 기존 document 반환(200)
+  - 신규 업로드 시 201
+- 평가 확정 webhook 추가
+  - `INTEGRATION_WEBHOOK_URL` 설정 시 `evaluation.finalized` 이벤트 POST
+  - 개발/테스트 기본 수신 URL: `http://127.0.0.1:3999/integration-webhook`
+  - payload: `sessionId`, `title`, `status`, `finalizedAt`, `selectedApplications`
+- OpenAPI 갱신
+  - `Idempotency-Key` header parameter 추가
+  - `webhooks.evaluationFinalized` 명세 추가
+- 검증
+  - `npx playwright test tests/integration-api.spec.ts tests/eval-api-coverage.spec.ts tests/eval-full-simulation.spec.ts --workers=1` -> 21 passed
+  - `npm run lint` -> success
+  - `npm run build` -> success
