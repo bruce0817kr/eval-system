@@ -1,3 +1,5 @@
+import { createHmac } from 'node:crypto'
+
 import { prisma } from '@/lib/db'
 
 type FinalizedWebhookApplication = {
@@ -63,6 +65,7 @@ async function buildFinalizedPayload(sessionId: string) {
     }))
 
   return {
+    eventId: `evaluation.finalized:${session.id}:${session.finalizedAt?.toISOString() ?? 'unknown'}`,
     event: 'evaluation.finalized',
     sessionId: session.id,
     title: session.title,
@@ -70,6 +73,22 @@ async function buildFinalizedPayload(sessionId: string) {
     finalizedAt: session.finalizedAt?.toISOString() ?? new Date().toISOString(),
     selectedApplications,
   }
+}
+
+function getWebhookSecret() {
+  return process.env.INTEGRATION_WEBHOOK_SECRET ?? process.env.AUTH_SECRET ?? 'dev-webhook-secret'
+}
+
+function signWebhookBody(body: string) {
+  return `sha256=${createHmac('sha256', getWebhookSecret()).update(body).digest('hex')}`
+}
+
+function retryDelayMs(attempt: number) {
+  return attempt * 100
+}
+
+async function sleep(ms: number) {
+  await new Promise((resolve) => setTimeout(resolve, ms))
 }
 
 export async function notifyIntegrationSessionFinalized(sessionId: string) {
@@ -83,15 +102,33 @@ export async function notifyIntegrationSessionFinalized(sessionId: string) {
     return
   }
 
-  try {
-    await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(payload),
-    })
-  } catch (error) {
-    console.error('Integration finalized webhook failed:', error)
+  const body = JSON.stringify(payload)
+  const maxAttempts = 3
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Event-Id': payload.eventId,
+          'X-Signature': signWebhookBody(body),
+        },
+        body,
+      })
+
+      if (response.ok) {
+        return
+      }
+
+      throw new Error(`Webhook responded with ${response.status}`)
+    } catch (error) {
+      if (attempt === maxAttempts) {
+        console.error('Integration finalized webhook failed:', error)
+        return
+      }
+
+      await sleep(retryDelayMs(attempt))
+    }
   }
 }

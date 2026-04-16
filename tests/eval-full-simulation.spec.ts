@@ -403,7 +403,11 @@ function clearSimulationOtpState() {
 }
 
 async function startWebhookReceiver() {
-  const received: unknown[] = []
+  const deliveries: Array<{
+    body: unknown
+    eventId: string | undefined
+    signature: string | undefined
+  }> = []
   const server = createServer((request: IncomingMessage, response) => {
     if (request.method !== 'POST' || request.url !== '/integration-webhook') {
       response.writeHead(404)
@@ -415,7 +419,16 @@ async function startWebhookReceiver() {
     request.on('data', (chunk: Buffer) => chunks.push(chunk))
     request.on('end', () => {
       const body = Buffer.concat(chunks).toString('utf8')
-      received.push(JSON.parse(body))
+      deliveries.push({
+        body: JSON.parse(body),
+        eventId: request.headers['x-event-id'] as string | undefined,
+        signature: request.headers['x-signature'] as string | undefined,
+      })
+      if (deliveries.length === 1) {
+        response.writeHead(500, { 'Content-Type': 'application/json' })
+        response.end(JSON.stringify({ ok: false, retry: true }))
+        return
+      }
       response.writeHead(200, { 'Content-Type': 'application/json' })
       response.end(JSON.stringify({ ok: true }))
     })
@@ -424,7 +437,7 @@ async function startWebhookReceiver() {
   await new Promise<void>((resolve) => server.listen(3999, '127.0.0.1', resolve))
 
   return {
-    received,
+    deliveries,
     close: () => new Promise<void>((resolve) => server.close(() => resolve())),
   }
 }
@@ -488,9 +501,13 @@ test('simulates 5 evaluators scoring 10 companies and verifies evaluator documen
       data: { status: 'finalized', reason: '시뮬레이션 최종 선정 확정' },
     })
     expect(finalize.ok()).toBeTruthy()
-    await expect.poll(() => webhookReceiver.received.length).toBe(1)
-    expect(webhookReceiver.received[0]).toEqual(
+    await expect.poll(() => webhookReceiver.deliveries.length).toBe(2)
+    expect(webhookReceiver.deliveries[0].eventId).toBe(webhookReceiver.deliveries[1].eventId)
+    expect(webhookReceiver.deliveries[1].eventId).toMatch(/^evaluation\.finalized:/)
+    expect(webhookReceiver.deliveries[1].signature).toMatch(/^sha256=/)
+    expect(webhookReceiver.deliveries[1].body).toEqual(
       expect.objectContaining({
+        eventId: webhookReceiver.deliveries[1].eventId,
         event: 'evaluation.finalized',
         sessionId: SESSION_ID,
         selectedApplications: [

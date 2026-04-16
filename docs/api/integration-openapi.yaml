@@ -12,8 +12,22 @@ webhooks:
   evaluationFinalized:
     post:
       summary: Outbound webhook sent when an evaluation session is finalized
-      description: Sent to `INTEGRATION_WEBHOOK_URL` after a session is finalized.
+      description: Sent to `INTEGRATION_WEBHOOK_URL` after a session is finalized. `X-Signature` is `sha256=<hmac>` over the raw JSON body using `INTEGRATION_WEBHOOK_SECRET` or `AUTH_SECRET`.
       operationId: receiveEvaluationFinalizedWebhook
+      parameters:
+        - name: X-Event-Id
+          in: header
+          required: true
+          schema:
+            type: string
+          description: Stable event id reused across delivery retries.
+        - name: X-Signature
+          in: header
+          required: true
+          schema:
+            type: string
+            pattern: '^sha256='
+          description: HMAC-SHA256 signature of the raw request body.
       requestBody:
         required: true
         content:
@@ -424,8 +438,11 @@ components:
           format: date-time
     EvaluationFinalizedWebhook:
       type: object
-      required: [event, sessionId, title, status, finalizedAt, selectedApplications]
+      required: [eventId, event, sessionId, title, status, finalizedAt, selectedApplications]
       properties:
+        eventId:
+          type: string
+          description: Stable event id reused across retries.
         event:
           type: string
           const: evaluation.finalized

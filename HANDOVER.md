@@ -259,3 +259,20 @@ S3_REGION=us-east-1
   - `npx playwright test tests/integration-api.spec.ts tests/eval-api-coverage.spec.ts tests/eval-full-simulation.spec.ts --workers=1` -> 21 passed
   - `npm run lint` -> success
   - `npm run build` -> success
+
+### 2026-04-16 webhook 서명/재시도 추가 보강
+- finalized webhook delivery 강화
+  - `eventId` payload 필드 추가
+  - `X-Event-Id` 헤더 추가
+  - `X-Signature: sha256=<hmac>` 헤더 추가
+  - 서명 secret: `INTEGRATION_WEBHOOK_SECRET` 우선, 없으면 `AUTH_SECRET`
+  - 비 2xx 응답 또는 네트워크 실패 시 최대 3회 재시도
+- OpenAPI 갱신
+  - finalized webhook header 명세 추가
+  - webhook payload `eventId` 필수화
+- 검증
+  - `npx playwright test tests/eval-full-simulation.spec.ts --workers=1` -> 1 passed
+  - `npx playwright test tests/eval-full-simulation.spec.ts tests/integration-api.spec.ts --workers=1` -> 3 passed
+  - `npx playwright test tests/integration-api.spec.ts tests/eval-api-coverage.spec.ts tests/eval-full-simulation.spec.ts --workers=1` -> 21 passed
+  - `npm run lint` -> success
+  - `npm run build` -> success
