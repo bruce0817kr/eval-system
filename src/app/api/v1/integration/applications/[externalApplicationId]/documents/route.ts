@@ -1,10 +1,11 @@
-import { NextResponse } from 'next/server'
 import { z } from 'zod'
 
 import { prisma } from '@/lib/db'
 import { uploadFile } from '@/lib/storage'
 import {
   integrationError,
+  integrationCreated,
+  integrationOk,
   integrationUnauthorized,
   verifyIntegrationRequest,
 } from '@/lib/integration/auth'
@@ -49,7 +50,7 @@ export async function POST(request: Request, context: RouteContext) {
     })
 
     if (existingDocument) {
-      return NextResponse.json({
+      return integrationOk({
         externalApplicationId: application.id,
         document: {
           id: existingDocument.id,
@@ -67,17 +68,17 @@ export async function POST(request: Request, context: RouteContext) {
   try {
     formData = await request.formData()
   } catch {
-    return integrationError('INVALID_FORM_DATA', 'Request must be multipart/form-data', 400)
+    return integrationError('INVALID_FORM_DATA', 'Request must be multipart/form-data', 422)
   }
 
   const file = formData.get('file')
   if (!(file instanceof File)) {
-    return integrationError('FILE_REQUIRED', 'Multipart field `file` is required', 400)
+    return integrationError('FILE_REQUIRED', 'Multipart field `file` is required', 422)
   }
 
   const parsedDocType = docTypeSchema.safeParse(formData.get('docType') ?? undefined)
   if (!parsedDocType.success) {
-    return integrationError('VALIDATION_ERROR', 'Document type is invalid', 400)
+    return integrationError('VALIDATION_ERROR', 'Document type is invalid', 422)
   }
 
   const isPdf =
@@ -86,7 +87,7 @@ export async function POST(request: Request, context: RouteContext) {
     file.name.toLowerCase().endsWith('.pdf')
 
   if (!isPdf) {
-    return integrationError('UNSUPPORTED_FILE_TYPE', 'Only PDF documents are supported', 400)
+    return integrationError('UNSUPPORTED_FILE_TYPE', 'Only PDF documents are supported', 422)
   }
 
   const buffer = Buffer.from(await file.arrayBuffer())
@@ -106,18 +107,15 @@ export async function POST(request: Request, context: RouteContext) {
     },
   })
 
-  return NextResponse.json(
-    {
-      externalApplicationId: application.id,
-      document: {
-        id: document.id,
-        docType: document.docType,
-        originalFilename: document.originalFilename,
-        mimeType: document.mimeType,
-        fileSize: document.fileSize,
-        uploadedAt: document.uploadedAt.toISOString(),
-      },
+  return integrationCreated({
+    externalApplicationId: application.id,
+    document: {
+      id: document.id,
+      docType: document.docType,
+      originalFilename: document.originalFilename,
+      mimeType: document.mimeType,
+      fileSize: document.fileSize,
+      uploadedAt: document.uploadedAt.toISOString(),
     },
-    { status: 201 },
-  )
+  })
 }

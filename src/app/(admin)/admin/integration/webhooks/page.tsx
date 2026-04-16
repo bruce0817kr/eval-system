@@ -1,6 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
+import Link from "next/link"
 import { RefreshCcwIcon } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
@@ -206,7 +207,12 @@ export default function IntegrationWebhooksPage() {
                   <TableRow key={delivery.eventId}>
                     <TableCell>
                       <div className="max-w-[420px] truncate font-mono text-xs">
-                        {delivery.eventId}
+                        <Link
+                          href={`/admin/integration/webhooks/${encodeURIComponent(delivery.eventId)}`}
+                          className="hover:underline"
+                        >
+                          {delivery.eventId}
+                        </Link>
                       </div>
                       <div className="text-xs text-muted-foreground">{delivery.eventType}</div>
                     </TableCell>

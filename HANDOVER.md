@@ -383,3 +383,23 @@ S3_REGION=us-east-1
   - `npm run lint` -> success
   - `npm run build` -> success
   - `npm run api:spec:check` -> success
+
+### 2026-04-16 사업관리 MVP 명세 반영
+- integration API 응답 envelope 적용
+  - 성공: `{ status: "ok|created|updated", data: ... }`
+  - 실패: `{ status: "failed|not_found", message, data: { code, details? } }`
+  - validation 계열 오류는 422로 조정
+- HMAC secret 환경변수명 반영
+  - `INTEGRATION_WEBHOOK_HMAC_SECRET` 우선 사용
+  - 기존 `INTEGRATION_WEBHOOK_SECRET`, `AUTH_SECRET` fallback 유지
+- integration health endpoint 추가
+  - `GET /api/v1/integration/health`
+  - `{ status: "ok", data: { version: "v1", auth: "bearer", timestamp } }`
+- webhook delivery 상세 API/화면 추가
+  - `GET /api/admin/integration/webhooks/[eventId]`
+  - `/admin/integration/webhooks/[eventId]`
+- 검증
+  - `npx playwright test tests/integration-api.spec.ts tests/eval-api-coverage.spec.ts tests/eval-full-simulation.spec.ts --workers=1` -> 22 passed
+  - `npm run api:spec:check` -> success
+  - `npm run lint` -> success
+  - `npm run build` -> success

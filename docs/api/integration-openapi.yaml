@@ -12,7 +12,7 @@ webhooks:
   evaluationFinalized:
     post:
       summary: Outbound webhook sent when an evaluation session is finalized
-      description: Sent to `INTEGRATION_WEBHOOK_URL` after a session is finalized. `X-Signature` is `sha256=<hmac>` over the raw JSON body using `INTEGRATION_WEBHOOK_SECRET` or `AUTH_SECRET`.
+      description: Sent to `INTEGRATION_WEBHOOK_URL` after a session is finalized. `X-Signature` is `sha256=<hmac>` over the raw JSON body using `INTEGRATION_WEBHOOK_HMAC_SECRET` or `AUTH_SECRET`.
       operationId: receiveEvaluationFinalizedWebhook
       parameters:
         - name: X-Event-Id
@@ -38,6 +38,19 @@ webhooks:
         '200':
           description: Webhook accepted by the business-management system
 paths:
+  /api/v1/integration/health:
+    get:
+      summary: Check integration API health and contract version
+      operationId: getIntegrationHealth
+      responses:
+        '200':
+          description: Integration API is available
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IntegrationHealthResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
   /api/v1/integration/sessions/{externalSessionId}:
     put:
       summary: Upsert an evaluation session from an external business or notice ID
@@ -151,6 +164,27 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/WebhookDeliveryNotFound'
+  /api/admin/integration/webhooks/{eventId}:
+    get:
+      summary: Read a webhook delivery detail in the admin API
+      operationId: getAdminWebhookDelivery
+      parameters:
+        - name: eventId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Delivery detail
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [delivery]
+                properties:
+                  delivery:
+                    $ref: '#/components/schemas/WebhookDeliveryDetail'
 components:
   securitySchemes:
     bearerAuth:
@@ -236,6 +270,22 @@ components:
           type: string
         details:
           description: Optional validation or diagnostic details.
+    IntegrationHealthResponse:
+      type: object
+      required: [status, version, auth, timestamp]
+      properties:
+        status:
+          type: string
+          const: ok
+        version:
+          type: string
+          const: v1
+        auth:
+          type: string
+          const: bearer
+        timestamp:
+          type: string
+          format: date-time
     SessionUpsertRequest:
       type: object
       required: [title]
@@ -512,3 +562,43 @@ components:
           type: string
         replayed:
           type: boolean
+    WebhookDeliveryDetail:
+      type: object
+      required:
+        - eventId
+        - eventType
+        - url
+        - payloadJson
+        - status
+        - attempts
+        - createdAt
+        - updatedAt
+      properties:
+        eventId:
+          type: string
+        eventType:
+          type: string
+        url:
+          type: string
+        payloadJson:
+          type: object
+        status:
+          type: string
+        attempts:
+          type: integer
+        lastStatus:
+          type: integer
+          nullable: true
+        lastError:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        deliveredAt:
+          type: string
+          format: date-time
+          nullable: true

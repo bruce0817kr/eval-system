@@ -6,11 +6,13 @@ const spec = readFileSync(specPath, 'utf8')
 const requiredSnippets = [
   'openapi: 3.1.0',
   'bearerAuth:',
+  '/api/v1/integration/health:',
   '/api/v1/integration/sessions/{externalSessionId}:',
   '/api/v1/integration/sessions/{externalSessionId}/applications:',
   '/api/v1/integration/sessions/{externalSessionId}/results:',
   '/api/v1/integration/applications/{externalApplicationId}/documents:',
   '/api/v1/integration/webhooks/{eventId}/replay:',
+  '/api/admin/integration/webhooks/{eventId}:',
   'evaluationFinalized:',
   'X-Event-Id',
   'X-Signature',
@@ -20,6 +22,8 @@ const requiredSnippets = [
   'DocumentUploadRequest:',
   'ResultsResponse:',
   'WebhookReplayResponse:',
+  'IntegrationHealthResponse:',
+  'WebhookDeliveryDetail:',
 ]
 
 const missing = requiredSnippets.filter((snippet) => !spec.includes(snippet))

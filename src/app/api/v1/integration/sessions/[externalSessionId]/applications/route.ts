@@ -1,9 +1,9 @@
-import { NextResponse } from 'next/server'
 import { z } from 'zod'
 
 import { prisma } from '@/lib/db'
 import {
   integrationError,
+  integrationUpdated,
   integrationUnauthorized,
   verifyIntegrationRequest,
 } from '@/lib/integration/auth'
@@ -43,12 +43,12 @@ export async function PUT(request: Request, context: RouteContext) {
   try {
     body = await request.json()
   } catch {
-    return integrationError('INVALID_JSON', 'Request body must be valid JSON', 400)
+    return integrationError('INVALID_JSON', 'Request body must be valid JSON', 422)
   }
 
   const parsed = applicationsBodySchema.safeParse(body)
   if (!parsed.success) {
-    return integrationError('VALIDATION_ERROR', 'Applications payload is invalid', 400, parsed.error.flatten())
+    return integrationError('VALIDATION_ERROR', 'Applications payload is invalid', 422, parsed.error.flatten())
   }
 
   const { externalSessionId } = await context.params
@@ -117,7 +117,7 @@ export async function PUT(request: Request, context: RouteContext) {
     return results
   })
 
-  return NextResponse.json({
+  return integrationUpdated({
     externalSessionId,
     upsertedCount: applications.length,
     applications,

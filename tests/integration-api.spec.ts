@@ -6,16 +6,33 @@ const EXTERNAL_SESSION_ID = 'external-session-restapi'
 const EXTERNAL_APPLICATION_ID = 'external-application-restapi-1'
 
 test.describe('business-management integration REST API', () => {
+  test('reports integration API health and version', async ({ request }) => {
+    const response = await request.get('/api/v1/integration/health', {
+      headers: { Authorization: AUTH_HEADER },
+    })
+
+    expect(response.status()).toBe(200)
+    expect(await response.json()).toEqual(
+      expect.objectContaining({
+        status: 'ok',
+        data: expect.objectContaining({
+          version: 'v1',
+          auth: 'bearer',
+        }),
+      }),
+    )
+  })
+
   test('rejects requests without bearer token', async ({ request }) => {
     const response = await request.put('/api/v1/integration/sessions/external-auth-check', {
       data: {
-        title: '인증 확인용 평가',
+        title: 'Auth check session',
       },
     })
 
     expect(response.status()).toBe(401)
     expect(await response.json()).toEqual({
-      code: 'UNAUTHORIZED',
+      status: 'failed',
       message: 'Missing or invalid integration bearer token',
     })
   })
@@ -29,8 +46,8 @@ test.describe('business-management integration REST API', () => {
       {
         headers: { Authorization: AUTH_HEADER },
         data: {
-          title: '외부 연동 지원사업',
-          description: '사업관리 시스템 연동 테스트',
+          title: 'External support program',
+          description: 'Synchronized from business-management system',
           committeeSize: 5,
           trimRule: 'exclude_min_max',
         },
@@ -40,9 +57,12 @@ test.describe('business-management integration REST API', () => {
     expect(sessionResponse.status()).toBe(200)
     expect(await sessionResponse.json()).toEqual(
       expect.objectContaining({
-        externalSessionId: EXTERNAL_SESSION_ID,
-        title: '외부 연동 지원사업',
-        status: 'draft',
+        status: 'updated',
+        data: expect.objectContaining({
+          externalSessionId: EXTERNAL_SESSION_ID,
+          title: 'External support program',
+          status: 'draft',
+        }),
       }),
     )
 
@@ -56,16 +76,16 @@ test.describe('business-management integration REST API', () => {
               externalApplicationId: EXTERNAL_APPLICATION_ID,
               company: {
                 externalCompanyId: 'external-company-restapi-1',
-                name: '외부 연동 기업 1',
+                name: 'External Company 1',
                 businessNumber: '777-66-55001',
-                ceoName: '연동대표',
+                ceoName: 'External CEO',
                 phone: '02-1111-2222',
                 email: 'integration-company-1@example.test',
-                address: '서울특별시 연동구',
+                address: 'Seoul',
                 industry: 'AI',
               },
               evaluationOrder: 1,
-              notes: '사업관리 시스템에서 동기화',
+              notes: 'Synchronized from business-management system',
             },
           ],
         },
@@ -75,14 +95,17 @@ test.describe('business-management integration REST API', () => {
     expect(applicationsResponse.status()).toBe(200)
     expect(await applicationsResponse.json()).toEqual(
       expect.objectContaining({
-        externalSessionId: EXTERNAL_SESSION_ID,
-        upsertedCount: 1,
-        applications: [
-          expect.objectContaining({
-            externalApplicationId: EXTERNAL_APPLICATION_ID,
-            companyName: '외부 연동 기업 1',
-          }),
-        ],
+        status: 'updated',
+        data: expect.objectContaining({
+          externalSessionId: EXTERNAL_SESSION_ID,
+          upsertedCount: 1,
+          applications: [
+            expect.objectContaining({
+              externalApplicationId: EXTERNAL_APPLICATION_ID,
+              companyName: 'External Company 1',
+            }),
+          ],
+        }),
       }),
     )
 
@@ -106,24 +129,30 @@ test.describe('business-management integration REST API', () => {
 
     expect(documentResponse.status()).toBe(201)
     const documentBody = (await documentResponse.json()) as {
-      externalApplicationId: string
-      document: {
-        id: string
-        originalFilename: string
-        mimeType: string
-        fileSize: number
+      status: string
+      data: {
+        externalApplicationId: string
+        document: {
+          id: string
+          originalFilename: string
+          mimeType: string
+          fileSize: number
+        }
       }
     }
     expect(documentBody).toEqual(
       expect.objectContaining({
-        externalApplicationId: EXTERNAL_APPLICATION_ID,
-        document: expect.objectContaining({
-          originalFilename: 'external-business-plan.pdf',
-          mimeType: 'application/pdf',
+        status: 'created',
+        data: expect.objectContaining({
+          externalApplicationId: EXTERNAL_APPLICATION_ID,
+          document: expect.objectContaining({
+            originalFilename: 'external-business-plan.pdf',
+            mimeType: 'application/pdf',
+          }),
         }),
       }),
     )
-    expect(documentBody.document.fileSize).toBeGreaterThan(0)
+    expect(documentBody.data.document.fileSize).toBeGreaterThan(0)
 
     const duplicateDocumentResponse = await request.post(
       `/api/v1/integration/applications/${EXTERNAL_APPLICATION_ID}/documents`,
@@ -144,7 +173,8 @@ test.describe('business-management integration REST API', () => {
     )
     expect(duplicateDocumentResponse.status()).toBe(200)
     const duplicateDocumentBody = (await duplicateDocumentResponse.json()) as typeof documentBody
-    expect(duplicateDocumentBody.document.id).toBe(documentBody.document.id)
+    expect(duplicateDocumentBody.status).toBe('ok')
+    expect(duplicateDocumentBody.data.document.id).toBe(documentBody.data.document.id)
 
     const resultsResponse = await request.get(
       `/api/v1/integration/sessions/${EXTERNAL_SESSION_ID}/results`,
@@ -156,15 +186,18 @@ test.describe('business-management integration REST API', () => {
     expect(resultsResponse.status()).toBe(200)
     expect(await resultsResponse.json()).toEqual(
       expect.objectContaining({
-        externalSessionId: EXTERNAL_SESSION_ID,
-        totalApplications: 1,
-        results: [
-          expect.objectContaining({
-            externalApplicationId: EXTERNAL_APPLICATION_ID,
-            companyName: '외부 연동 기업 1',
-            selected: false,
-          }),
-        ],
+        status: 'ok',
+        data: expect.objectContaining({
+          externalSessionId: EXTERNAL_SESSION_ID,
+          totalApplications: 1,
+          results: [
+            expect.objectContaining({
+              externalApplicationId: EXTERNAL_APPLICATION_ID,
+              companyName: 'External Company 1',
+              selected: false,
+            }),
+          ],
+        }),
       }),
     )
   })

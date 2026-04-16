@@ -1,7 +1,6 @@
-import { NextResponse } from 'next/server'
-
 import {
   integrationError,
+  integrationOk,
   integrationUnauthorized,
   verifyIntegrationRequest,
 } from '@/lib/integration/auth'
@@ -23,5 +22,5 @@ export async function POST(request: Request, context: RouteContext) {
     return integrationError('WEBHOOK_DELIVERY_NOT_FOUND', 'Webhook delivery was not found', 404)
   }
 
-  return NextResponse.json({ eventId: decodeURIComponent(eventId), replayed: true })
+  return integrationOk({ eventId: decodeURIComponent(eventId), replayed: true })
 }

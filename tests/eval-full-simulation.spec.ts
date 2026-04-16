@@ -573,8 +573,28 @@ test('simulates 5 evaluators scoring 10 companies and verifies evaluator documen
     await expect(page.getByRole('heading', { name: 'Integration Webhooks' })).toBeVisible()
     await expect(page.getByRole('link', { name: /Integration Webhooks/ })).toBeVisible()
     await expect(page.getByLabel('Status filter')).toBeVisible()
-    await expect(page.getByText(webhookReceiver.deliveries[1].eventId!)).toBeVisible()
+    await expect(page.getByText(webhookReceiver.deliveries[1].eventId!).first()).toBeVisible()
     await expect(page.getByText('delivered').first()).toBeVisible()
+
+    const detail = await request.get(
+      `/api/admin/integration/webhooks/${encodeURIComponent(webhookReceiver.deliveries[1].eventId!)}`,
+    )
+    expect(detail.ok()).toBeTruthy()
+    expect(await detail.json()).toEqual(
+      expect.objectContaining({
+        delivery: expect.objectContaining({
+          eventId: webhookReceiver.deliveries[1].eventId,
+          payloadJson: expect.objectContaining({
+            event: 'evaluation.finalized',
+          }),
+        }),
+      }),
+    )
+
+    await page.goto(`/admin/integration/webhooks/${encodeURIComponent(webhookReceiver.deliveries[1].eventId!)}`)
+    await expect(page.getByRole('heading', { name: 'Webhook Delivery Detail' })).toBeVisible()
+    await expect(page.getByText(webhookReceiver.deliveries[1].eventId!).first()).toBeVisible()
+    await expect(page.getByText('evaluation.finalized').first()).toBeVisible()
   } finally {
     await webhookReceiver.close()
   }

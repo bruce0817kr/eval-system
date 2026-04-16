@@ -1,8 +1,7 @@
-import { NextResponse } from 'next/server'
-
 import { prisma } from '@/lib/db'
 import {
   integrationError,
+  integrationOk,
   integrationUnauthorized,
   verifyIntegrationRequest,
 } from '@/lib/integration/auth'
@@ -65,7 +64,7 @@ export async function GET(request: Request, context: RouteContext) {
       return a.rank - b.rank
     })
 
-  return NextResponse.json({
+  return integrationOk({
     externalSessionId: session.id,
     title: session.title,
     status: session.status,

@@ -13,7 +13,26 @@ All integration endpoints require:
 Authorization: Bearer <INTEGRATION_API_KEY>
 ```
 
+Integration API responses use the shared envelope:
+
+```json
+{
+  "status": "ok",
+  "message": "optional message",
+  "data": {}
+}
+```
+
+Status values follow the business-management convention: `ok`, `created`, `updated`, `failed`, and `not_found`.
+
 ## 1. Upsert Evaluation Session
+
+Check API health first:
+
+```bash
+curl "$BASE_URL/api/v1/integration/health" \
+  -H "Authorization: Bearer $TOKEN"
+```
 
 ```bash
 curl -X PUT "$BASE_URL/api/v1/integration/sessions/ext-notice-2026-001" \
@@ -96,7 +115,7 @@ X-Event-Id: evaluation.finalized:<sessionId>:<finalizedAt>
 X-Signature: sha256=<hmac>
 ```
 
-`X-Signature` is an HMAC-SHA256 over the raw JSON body using `INTEGRATION_WEBHOOK_SECRET`; if unset, `AUTH_SECRET` is used.
+`X-Signature` is an HMAC-SHA256 over the raw JSON body using `INTEGRATION_WEBHOOK_HMAC_SECRET`; if unset, `AUTH_SECRET` is used.
 
 Payload:
 
@@ -132,6 +151,6 @@ Required environment variables for production:
 ```bash
 INTEGRATION_API_KEY=<strong random token>
 INTEGRATION_WEBHOOK_URL=<business-management callback URL>
-INTEGRATION_WEBHOOK_SECRET=<strong random secret>
+INTEGRATION_WEBHOOK_HMAC_SECRET=<strong random secret>
 AUTH_SECRET=<strong random secret>
 ```

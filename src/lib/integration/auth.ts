@@ -22,7 +22,7 @@ export function verifyIntegrationRequest(request: Request) {
 export function integrationUnauthorized() {
   return NextResponse.json(
     {
-      code: 'UNAUTHORIZED',
+      status: 'failed',
       message: 'Missing or invalid integration bearer token',
     },
     { status: 401 },
@@ -30,12 +30,28 @@ export function integrationUnauthorized() {
 }
 
 export function integrationError(code: string, message: string, status: number, details?: unknown) {
+  const envelopeStatus = status === 404 ? 'not_found' : 'failed'
   return NextResponse.json(
     {
-      code,
+      status: envelopeStatus,
       message,
-      ...(details === undefined ? {} : { details }),
+      data: {
+        code,
+        ...(details === undefined ? {} : { details }),
+      },
     },
     { status },
   )
+}
+
+export function integrationOk<T>(data: T) {
+  return NextResponse.json({ status: 'ok', data })
+}
+
+export function integrationUpdated<T>(data: T) {
+  return NextResponse.json({ status: 'updated', data })
+}
+
+export function integrationCreated<T>(data: T) {
+  return NextResponse.json({ status: 'created', data }, { status: 201 })
 }

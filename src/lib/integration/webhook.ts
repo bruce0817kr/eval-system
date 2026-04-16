@@ -77,7 +77,12 @@ async function buildFinalizedPayload(sessionId: string) {
 }
 
 function getWebhookSecret() {
-  return process.env.INTEGRATION_WEBHOOK_SECRET ?? process.env.AUTH_SECRET ?? 'dev-webhook-secret'
+  return (
+    process.env.INTEGRATION_WEBHOOK_HMAC_SECRET ??
+    process.env.INTEGRATION_WEBHOOK_SECRET ??
+    process.env.AUTH_SECRET ??
+    'dev-webhook-secret'
+  )
 }
 
 function signWebhookBody(body: string) {
@@ -255,5 +260,29 @@ export async function listIntegrationWebhookDeliveriesPage(input: {
   return {
     deliveries,
     total,
+  }
+}
+
+export async function getIntegrationWebhookDelivery(eventId: string) {
+  const delivery = await prisma.integrationWebhookDelivery.findUnique({
+    where: { eventId },
+  })
+
+  if (!delivery) {
+    return null
+  }
+
+  return {
+    eventId: delivery.eventId,
+    eventType: delivery.eventType,
+    url: delivery.url,
+    payloadJson: delivery.payloadJson,
+    status: delivery.status,
+    attempts: delivery.attempts,
+    lastStatus: delivery.lastStatus,
+    lastError: delivery.lastError,
+    createdAt: delivery.createdAt.toISOString(),
+    updatedAt: delivery.updatedAt.toISOString(),
+    deliveredAt: delivery.deliveredAt?.toISOString() ?? null,
   }
 }
