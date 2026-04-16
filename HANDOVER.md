@@ -367,3 +367,19 @@ S3_REGION=us-east-1
   - `npx playwright test tests/integration-api.spec.ts tests/eval-api-coverage.spec.ts tests/eval-full-simulation.spec.ts --workers=1` -> 21 passed
   - `npm run lint` -> success
   - `npm run build` -> success
+
+### 2026-04-16 webhook delivery Prisma client 전환
+- `integration_webhook_delivery` 접근을 Prisma client 기반으로 전환
+  - raw SQL insert/update/select 제거
+  - `prisma.integrationWebhookDelivery.upsert/update/findMany/count` 사용
+- Prisma schema field mapping 수정
+  - camelCase model field와 snake_case DB 컬럼을 `@map(...)`으로 연결
+  - `eventId -> event_id`, `payloadJson -> payload_json`, `lastStatus -> last_status` 등
+- Prisma client 재생성
+  - `npm run db:generate`
+- 검증
+  - `npx playwright test tests/eval-full-simulation.spec.ts tests/integration-api.spec.ts --workers=1` -> 3 passed
+  - `npx playwright test tests/integration-api.spec.ts tests/eval-api-coverage.spec.ts tests/eval-full-simulation.spec.ts --workers=1` -> 21 passed
+  - `npm run lint` -> success
+  - `npm run build` -> success
+  - `npm run api:spec:check` -> success

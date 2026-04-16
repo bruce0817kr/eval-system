@@ -1,5 +1,6 @@
 import { createHmac } from 'node:crypto'
 
+import type { Prisma } from '@/generated/prisma/client'
 import { prisma } from '@/lib/db'
 
 type FinalizedWebhookApplication = {
@@ -99,14 +100,21 @@ async function sendWebhookWithRetries(input: {
   const body = JSON.stringify(input.payload)
   const maxAttempts = input.maxAttempts ?? 3
 
-  await prisma.$executeRaw`
-    INSERT INTO integration_webhook_delivery (event_id, event_type, url, payload_json, status, updated_at)
-    VALUES (${input.payload.eventId}, ${input.payload.event}, ${input.url}, ${body}::jsonb, 'pending', CURRENT_TIMESTAMP)
-    ON CONFLICT (event_id) DO UPDATE SET
-      url = EXCLUDED.url,
-      payload_json = EXCLUDED.payload_json,
-      updated_at = CURRENT_TIMESTAMP
-  `
+  await prisma.integrationWebhookDelivery.upsert({
+    where: { eventId: input.payload.eventId },
+    create: {
+      eventId: input.payload.eventId,
+      eventType: input.payload.event,
+      url: input.url,
+      payloadJson: input.payload as Prisma.InputJsonValue,
+      status: 'pending',
+    },
+    update: {
+      url: input.url,
+      payloadJson: input.payload as Prisma.InputJsonValue,
+      updatedAt: new Date(),
+    },
+  })
 
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
     try {
@@ -120,36 +128,39 @@ async function sendWebhookWithRetries(input: {
         body,
       })
 
-      await prisma.$executeRaw`
-        UPDATE integration_webhook_delivery
-        SET attempts = attempts + 1,
-            last_status = ${response.status},
-            last_error = NULL,
-            updated_at = CURRENT_TIMESTAMP
-        WHERE event_id = ${input.payload.eventId}
-      `
+      await prisma.integrationWebhookDelivery.update({
+        where: { eventId: input.payload.eventId },
+        data: {
+          attempts: { increment: 1 },
+          lastStatus: response.status,
+          lastError: null,
+          updatedAt: new Date(),
+        },
+      })
 
       if (response.ok) {
-        await prisma.$executeRaw`
-          UPDATE integration_webhook_delivery
-          SET status = 'delivered',
-              delivered_at = CURRENT_TIMESTAMP,
-              updated_at = CURRENT_TIMESTAMP
-          WHERE event_id = ${input.payload.eventId}
-        `
+        await prisma.integrationWebhookDelivery.update({
+          where: { eventId: input.payload.eventId },
+          data: {
+            status: 'delivered',
+            deliveredAt: new Date(),
+            updatedAt: new Date(),
+          },
+        })
         return
       }
 
       throw new Error(`Webhook responded with ${response.status}`)
     } catch (error) {
       if (attempt === maxAttempts) {
-        await prisma.$executeRaw`
-          UPDATE integration_webhook_delivery
-          SET status = 'failed',
-              last_error = ${error instanceof Error ? error.message : String(error)},
-              updated_at = CURRENT_TIMESTAMP
-          WHERE event_id = ${input.payload.eventId}
-        `
+        await prisma.integrationWebhookDelivery.update({
+          where: { eventId: input.payload.eventId },
+          data: {
+            status: 'failed',
+            lastError: error instanceof Error ? error.message : String(error),
+            updatedAt: new Date(),
+          },
+        })
         console.error('Integration finalized webhook failed:', error)
         return
       }
@@ -174,13 +185,10 @@ export async function notifyIntegrationSessionFinalized(sessionId: string) {
 }
 
 export async function replayIntegrationWebhook(eventId: string) {
-  const rows = await prisma.$queryRaw<Array<{ url: string; payload_json: { eventId: string; event: string } }>>`
-    SELECT url, payload_json
-    FROM integration_webhook_delivery
-    WHERE event_id = ${eventId}
-    LIMIT 1
-  `
-  const delivery = rows[0]
+  const delivery = await prisma.integrationWebhookDelivery.findUnique({
+    where: { eventId },
+    select: { url: true, payloadJson: true },
+  })
 
   if (!delivery) {
     return false
@@ -188,45 +196,29 @@ export async function replayIntegrationWebhook(eventId: string) {
 
   await sendWebhookWithRetries({
     url: delivery.url,
-    payload: delivery.payload_json,
+    payload: delivery.payloadJson as { eventId: string; event: string },
     maxAttempts: 1,
   })
   return true
 }
 
 export async function listIntegrationWebhookDeliveries(limit = 50) {
-  const rows = await prisma.$queryRaw<
-    Array<{
-      event_id: string
-      event_type: string
-      url: string
-      status: string
-      attempts: number
-      last_status: number | null
-      last_error: string | null
-      created_at: Date
-      updated_at: Date
-      delivered_at: Date | null
-    }>
-  >`
-    SELECT event_id, event_type, url, status, attempts, last_status, last_error,
-           created_at, updated_at, delivered_at
-    FROM integration_webhook_delivery
-    ORDER BY updated_at DESC
-    LIMIT ${limit}
-  `
+  const rows = await prisma.integrationWebhookDelivery.findMany({
+    orderBy: { updatedAt: 'desc' },
+    take: limit,
+  })
 
   return rows.map((row) => ({
-    eventId: row.event_id,
-    eventType: row.event_type,
+    eventId: row.eventId,
+    eventType: row.eventType,
     url: row.url,
     status: row.status,
     attempts: row.attempts,
-    lastStatus: row.last_status,
-    lastError: row.last_error,
-    createdAt: row.created_at.toISOString(),
-    updatedAt: row.updated_at.toISOString(),
-    deliveredAt: row.delivered_at?.toISOString() ?? null,
+    lastStatus: row.lastStatus,
+    lastError: row.lastError,
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString(),
+    deliveredAt: row.deliveredAt?.toISOString() ?? null,
   }))
 }
 
@@ -236,68 +228,32 @@ export async function listIntegrationWebhookDeliveriesPage(input: {
   status?: string | null
 }) {
   const offset = (input.page - 1) * input.pageSize
-  const rows = input.status
-    ? await prisma.$queryRaw<
-        Array<{
-          event_id: string
-          event_type: string
-          url: string
-          status: string
-          attempts: number
-          last_status: number | null
-          last_error: string | null
-          created_at: Date
-          updated_at: Date
-          delivered_at: Date | null
-          total_count: bigint
-        }>
-      >`
-        SELECT event_id, event_type, url, status, attempts, last_status, last_error,
-               created_at, updated_at, delivered_at, COUNT(*) OVER() AS total_count
-        FROM integration_webhook_delivery
-        WHERE status = ${input.status}
-        ORDER BY updated_at DESC
-        LIMIT ${input.pageSize}
-        OFFSET ${offset}
-      `
-    : await prisma.$queryRaw<
-        Array<{
-          event_id: string
-          event_type: string
-          url: string
-          status: string
-          attempts: number
-          last_status: number | null
-          last_error: string | null
-          created_at: Date
-          updated_at: Date
-          delivered_at: Date | null
-          total_count: bigint
-        }>
-      >`
-        SELECT event_id, event_type, url, status, attempts, last_status, last_error,
-               created_at, updated_at, delivered_at, COUNT(*) OVER() AS total_count
-        FROM integration_webhook_delivery
-        ORDER BY updated_at DESC
-        LIMIT ${input.pageSize}
-        OFFSET ${offset}
-      `
+  const where = input.status ? { status: input.status } : {}
+  const [rows, total] = await Promise.all([
+    prisma.integrationWebhookDelivery.findMany({
+      where,
+      orderBy: { updatedAt: 'desc' },
+      skip: offset,
+      take: input.pageSize,
+    }),
+    prisma.integrationWebhookDelivery.count({ where }),
+  ])
 
   const deliveries = rows.map((row) => ({
-    eventId: row.event_id,
-    eventType: row.event_type,
+    eventId: row.eventId,
+    eventType: row.eventType,
     url: row.url,
     status: row.status,
     attempts: row.attempts,
-    lastStatus: row.last_status,
-    lastError: row.last_error,
-    createdAt: row.created_at.toISOString(),
-    updatedAt: row.updated_at.toISOString(),
-    deliveredAt: row.delivered_at?.toISOString() ?? null,
+    lastStatus: row.lastStatus,
+    lastError: row.lastError,
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString(),
+    deliveredAt: row.deliveredAt?.toISOString() ?? null,
   }))
 
   return {
     deliveries,
-    total: Number(rows[0]?.total_count ?? 0),
+    total,
   }
 }

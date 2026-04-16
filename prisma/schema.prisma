@@ -445,17 +445,17 @@ model AuditEvent {
 }
 
 model IntegrationWebhookDelivery {
-  eventId     String    @id
-  eventType   String
+  eventId     String    @id @map("event_id")
+  eventType   String    @map("event_type")
   url         String
-  payloadJson Json
+  payloadJson Json      @map("payload_json")
   status      String
   attempts    Int       @default(0)
-  lastStatus  Int?
-  lastError   String?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @default(now())
-  deliveredAt DateTime?
+  lastStatus  Int?      @map("last_status")
+  lastError   String?   @map("last_error")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @default(now()) @map("updated_at")
+  deliveredAt DateTime? @map("delivered_at")
 
   @@map("integration_webhook_delivery")
 }
