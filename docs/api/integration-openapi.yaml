@@ -129,6 +129,28 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/ApplicationNotFound'
+  /api/v1/integration/webhooks/{eventId}/replay:
+    post:
+      summary: Replay a previously logged integration webhook delivery
+      operationId: replayIntegrationWebhook
+      parameters:
+        - name: eventId
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Event id from the original webhook delivery.
+      responses:
+        '200':
+          description: Replay requested
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WebhookReplayResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/WebhookDeliveryNotFound'
 components:
   securitySchemes:
     bearerAuth:
@@ -194,6 +216,15 @@ components:
           example:
             code: APPLICATION_NOT_FOUND
             message: Integration application not found
+    WebhookDeliveryNotFound:
+      description: Webhook delivery log was not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            code: WEBHOOK_DELIVERY_NOT_FOUND
+            message: Webhook delivery was not found
   schemas:
     ErrorResponse:
       type: object
@@ -473,3 +504,11 @@ components:
           minimum: 1
         finalScore:
           type: number
+    WebhookReplayResponse:
+      type: object
+      required: [eventId, replayed]
+      properties:
+        eventId:
+          type: string
+        replayed:
+          type: boolean

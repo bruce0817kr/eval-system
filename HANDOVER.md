@@ -276,3 +276,19 @@ S3_REGION=us-east-1
   - `npx playwright test tests/integration-api.spec.ts tests/eval-api-coverage.spec.ts tests/eval-full-simulation.spec.ts --workers=1` -> 21 passed
   - `npm run lint` -> success
   - `npm run build` -> success
+
+### 2026-04-16 webhook delivery log/replay 추가
+- persistent delivery log 추가
+  - `integration_webhook_delivery` 테이블을 필요 시 자동 생성
+  - 저장 항목: `event_id`, `event_type`, `url`, `payload_json`, `status`, `attempts`, `last_status`, `last_error`, `delivered_at`
+- replay API 추가
+  - `POST /api/v1/integration/webhooks/[eventId]/replay`
+  - 인증: `Authorization: Bearer <INTEGRATION_API_KEY>`
+  - 기존 payload와 event id로 webhook 재전송
+- OpenAPI 갱신
+  - replay endpoint 및 `WebhookReplayResponse` 추가
+- 검증
+  - `npx playwright test tests/eval-full-simulation.spec.ts --workers=1` -> 1 passed
+  - `npx playwright test tests/integration-api.spec.ts tests/eval-api-coverage.spec.ts tests/eval-full-simulation.spec.ts --workers=1` -> 21 passed
+  - `npm run lint` -> success
+  - `npm run build` -> success

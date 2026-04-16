@@ -6,6 +6,7 @@ import { createServer, type IncomingMessage } from 'http'
 
 const ADMIN_EMAIL = 'testadmin@test.com'
 const ADMIN_PASSWORD = 'TestAdmin123!'
+const INTEGRATION_AUTH_HEADER = 'Bearer test-integration-key'
 
 const SESSION_ID = 'sim-session-2026'
 const FORM_ID = 'sim-form-2026'
@@ -517,6 +518,26 @@ test('simulates 5 evaluators scoring 10 companies and verifies evaluator documen
         ],
       }),
     )
+    await withDb(async (client) => {
+      const delivery = await client.query<{
+        status: string
+        attempts: number
+      }>(
+        'SELECT status, attempts FROM integration_webhook_delivery WHERE event_id = $1',
+        [webhookReceiver.deliveries[1].eventId],
+      )
+      expect(delivery.rows[0]).toEqual({ status: 'delivered', attempts: 2 })
+    })
+
+    const replay = await request.post(
+      `/api/v1/integration/webhooks/${encodeURIComponent(webhookReceiver.deliveries[1].eventId!)}/replay`,
+      {
+        headers: { Authorization: INTEGRATION_AUTH_HEADER },
+      },
+    )
+    expect(replay.ok()).toBeTruthy()
+    await expect.poll(() => webhookReceiver.deliveries.length).toBe(3)
+    expect(webhookReceiver.deliveries[2].eventId).toBe(webhookReceiver.deliveries[1].eventId)
   } finally {
     await webhookReceiver.close()
   }
