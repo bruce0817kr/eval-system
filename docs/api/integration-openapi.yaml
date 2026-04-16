@@ -1,0 +1,320 @@
+openapi: 3.1.0
+info:
+  title: Evaluation System Integration API
+  version: 0.1.0
+  description: REST API for synchronizing business-management system data into the evaluation system and reading evaluation results.
+servers:
+  - url: http://localhost:3003
+    description: Local development
+security:
+  - bearerAuth: []
+paths:
+  /api/v1/integration/sessions/{externalSessionId}:
+    put:
+      summary: Upsert an evaluation session from an external business or notice ID
+      operationId: upsertIntegrationSession
+      parameters:
+        - $ref: '#/components/parameters/ExternalSessionId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SessionUpsertRequest'
+      responses:
+        '200':
+          description: Session created or updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /api/v1/integration/sessions/{externalSessionId}/applications:
+    put:
+      summary: Bulk upsert applications and companies for an external session
+      operationId: upsertIntegrationApplications
+      parameters:
+        - $ref: '#/components/parameters/ExternalSessionId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApplicationsUpsertRequest'
+      responses:
+        '200':
+          description: Applications created or updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApplicationsUpsertResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/SessionNotFound'
+  /api/v1/integration/sessions/{externalSessionId}/results:
+    get:
+      summary: Read evaluation results for an external session
+      operationId: getIntegrationSessionResults
+      parameters:
+        - $ref: '#/components/parameters/ExternalSessionId'
+      responses:
+        '200':
+          description: Session results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResultsResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/SessionNotFound'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      description: Use `Authorization: Bearer <INTEGRATION_API_KEY>`.
+  parameters:
+    ExternalSessionId:
+      name: externalSessionId
+      in: path
+      required: true
+      description: Stable business-management system session, notice, or project ID.
+      schema:
+        type: string
+        minLength: 1
+  responses:
+    Unauthorized:
+      description: Missing or invalid bearer token
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            code: UNAUTHORIZED
+            message: Missing or invalid integration bearer token
+    ValidationError:
+      description: Invalid request payload
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    SessionNotFound:
+      description: External session was not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            code: SESSION_NOT_FOUND
+            message: Integration session not found
+  schemas:
+    ErrorResponse:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+        details:
+          description: Optional validation or diagnostic details.
+    SessionUpsertRequest:
+      type: object
+      required: [title]
+      properties:
+        title:
+          type: string
+          minLength: 1
+        description:
+          type: string
+          nullable: true
+        committeeSize:
+          type: integer
+          minimum: 1
+          maximum: 50
+          default: 5
+        trimRule:
+          type: string
+          default: exclude_min_max
+    SessionResponse:
+      type: object
+      required:
+        - externalSessionId
+        - title
+        - status
+        - committeeSize
+        - trimRule
+        - updatedAt
+      properties:
+        externalSessionId:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+          nullable: true
+        status:
+          type: string
+          enum: [draft, open, in_progress, closed, finalized]
+        committeeSize:
+          type: integer
+        trimRule:
+          type: string
+        updatedAt:
+          type: string
+          format: date-time
+    ApplicationsUpsertRequest:
+      type: object
+      required: [applications]
+      properties:
+        applications:
+          type: array
+          minItems: 1
+          maxItems: 200
+          items:
+            $ref: '#/components/schemas/ApplicationUpsertItem'
+    ApplicationUpsertItem:
+      type: object
+      required: [externalApplicationId, company]
+      properties:
+        externalApplicationId:
+          type: string
+          minLength: 1
+        evaluationOrder:
+          type: integer
+          minimum: 0
+          default: 0
+        notes:
+          type: string
+          nullable: true
+        company:
+          $ref: '#/components/schemas/CompanyUpsertItem'
+    CompanyUpsertItem:
+      type: object
+      required: [externalCompanyId, name]
+      properties:
+        externalCompanyId:
+          type: string
+          minLength: 1
+        name:
+          type: string
+          minLength: 1
+        ceoName:
+          type: string
+          nullable: true
+        businessNumber:
+          type: string
+          nullable: true
+        address:
+          type: string
+          nullable: true
+        phone:
+          type: string
+          nullable: true
+        email:
+          type: string
+          format: email
+          nullable: true
+        industry:
+          type: string
+          nullable: true
+    ApplicationsUpsertResponse:
+      type: object
+      required: [externalSessionId, upsertedCount, applications]
+      properties:
+        externalSessionId:
+          type: string
+        upsertedCount:
+          type: integer
+        applications:
+          type: array
+          items:
+            $ref: '#/components/schemas/ApplicationResponseItem'
+    ApplicationResponseItem:
+      type: object
+      required:
+        - externalApplicationId
+        - externalCompanyId
+        - companyName
+        - evaluationOrder
+        - status
+      properties:
+        externalApplicationId:
+          type: string
+        externalCompanyId:
+          type: string
+        companyName:
+          type: string
+        evaluationOrder:
+          type: integer
+        status:
+          type: string
+          enum: [registered, evaluating, completed, excluded]
+    ResultsResponse:
+      type: object
+      required:
+        - externalSessionId
+        - title
+        - status
+        - generatedAt
+        - totalApplications
+        - evaluatedApplications
+        - results
+      properties:
+        externalSessionId:
+          type: string
+        title:
+          type: string
+        status:
+          type: string
+          enum: [draft, open, in_progress, closed, finalized]
+        generatedAt:
+          type: string
+          format: date-time
+        totalApplications:
+          type: integer
+        evaluatedApplications:
+          type: integer
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/ResultItem'
+    ResultItem:
+      type: object
+      required:
+        - externalApplicationId
+        - externalCompanyId
+        - companyName
+        - rank
+        - finalScore
+        - selected
+        - signedSubmissionCount
+        - status
+      properties:
+        externalApplicationId:
+          type: string
+        externalCompanyId:
+          type: string
+        companyName:
+          type: string
+        rank:
+          type: integer
+          nullable: true
+        finalScore:
+          type: number
+          nullable: true
+        selected:
+          type: boolean
+          description: True when rank is 1, 2, or 3.
+        signedSubmissionCount:
+          type: integer
+        status:
+          type: string
+          enum: [registered, evaluating, completed, excluded]

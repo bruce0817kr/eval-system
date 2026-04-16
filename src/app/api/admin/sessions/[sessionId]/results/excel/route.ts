@@ -94,7 +94,7 @@ export async function GET(
         return aRank - bRank
       })
 
-      const mainData = sortedApps.map((app, idx) => {
+      const mainData = sortedApps.map((app) => {
         const snapshot = app.resultSnapshots[0]
         return escapeRow({
           '순위': snapshot?.rank || '',
@@ -178,7 +178,7 @@ export async function GET(
 
       const excelBuffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' })
 
-      const filename = `evaluation-results-${evalSession.title.replace(/[^a-zA-Z0-9가-힣]/g, '-')}.xlsx`
+      const filename = `evaluation-results-${evalSession.id}.xlsx`
 
       return new NextResponse(excelBuffer, {
         status: 200,

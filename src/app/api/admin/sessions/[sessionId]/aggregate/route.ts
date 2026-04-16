@@ -1,8 +1,40 @@
 import { NextRequest, NextResponse } from 'next/server'
+import type { Prisma } from '@/generated/prisma/client'
 import { prisma } from '@/lib/db'
 import { getAdminSession, requireRole } from '@/lib/auth/jwt'
 import { logAuditEvent } from '@/lib/audit'
 import type { FormSchema, FormItem } from '@/lib/form-template-schema'
+
+type SubmissionScores = {
+  perItem?: Record<string, { weightedScore?: number; rawScore?: number }>
+  [criterionId: string]: unknown
+}
+
+function getSubmissionCriterionScores(scores: SubmissionScores | null) {
+  const criterionScores: Record<string, number> = {}
+
+  if (!scores) {
+    return criterionScores
+  }
+
+  if (scores.perItem && typeof scores.perItem === 'object') {
+    for (const [criterionId, detail] of Object.entries(scores.perItem)) {
+      if (detail && typeof detail.weightedScore === 'number') {
+        criterionScores[criterionId] = detail.weightedScore
+      }
+    }
+
+    return criterionScores
+  }
+
+  for (const [criterionId, value] of Object.entries(scores)) {
+    if (typeof value === 'number') {
+      criterionScores[criterionId] = value
+    }
+  }
+
+  return criterionScores
+}
 
 export async function POST(
   request: NextRequest,
@@ -86,7 +118,7 @@ export async function POST(
             .filter(sub => sub.submissionState === 'signed')
             .map(sub => ({
               committeeMemberId: sub.committeeMemberId,
-              scores: sub.scoresJson as Record<string, number> | null,
+              scores: getSubmissionCriterionScores(sub.scoresJson as SubmissionScores | null),
               totalScore: sub.totalScore
             }))
 
@@ -148,7 +180,7 @@ export async function POST(
           sections.forEach(section => {
             section.items.forEach((item: FormItem) => {
               if (item.type === 'radio_score' && trimmedScoresJson[item.id] !== undefined) {
-                finalScore += trimmedScoresJson[item.id] * (item.weight / 100)
+                finalScore += trimmedScoresJson[item.id]
               }
             })
           })
@@ -207,7 +239,7 @@ export async function POST(
           rank: r.success ? r.rank : null,
           error: r.success ? null : r.error
         })),
-        computedAt: new Date()
+        computedAt: new Date().toISOString()
       }
 
       await prisma.$transaction(async (tx) => {
@@ -217,16 +249,16 @@ export async function POST(
             create: {
               applicationId: result.applicationId,
               sessionId: resolvedParams.sessionId,
-              rawScoresJson: result.rawScores as any,
-              trimmedScoresJson: result.trimmedScores as any,
+              rawScoresJson: result.rawScores as Prisma.InputJsonValue,
+              trimmedScoresJson: result.trimmedScores as Prisma.InputJsonValue,
               finalScore: result.finalScore,
               rank: result.rank,
               computedAt: new Date(),
               computedById: session.id,
             },
             update: {
-              rawScoresJson: result.rawScores as any,
-              trimmedScoresJson: result.trimmedScores as any,
+              rawScoresJson: result.rawScores as Prisma.InputJsonValue,
+              trimmedScoresJson: result.trimmedScores as Prisma.InputJsonValue,
               finalScore: result.finalScore,
               rank: result.rank,
               computedAt: new Date(),
@@ -240,7 +272,7 @@ export async function POST(
           data: {
             successCount: successfulResultsData.length,
             errorCount: evalSession.applications.length - successfulResultsData.length,
-            resultJson: resultJsonData as any,
+            resultJson: resultJsonData as Prisma.InputJsonValue,
           },
         })
 

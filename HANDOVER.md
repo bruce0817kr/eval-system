@@ -178,3 +178,41 @@ S3_REGION=us-east-1
 ```
 </content>
 </invoke>
+
+---
+
+## 2026-04-16 REST API 연동/평가 시뮬레이션 인수인계
+
+### 완료
+- 사업관리 시스템 연동용 REST API v1 추가
+  - `PUT /api/v1/integration/sessions/[externalSessionId]`
+  - `PUT /api/v1/integration/sessions/[externalSessionId]/applications`
+  - `GET /api/v1/integration/sessions/[externalSessionId]/results`
+- 연동 인증 추가
+  - `Authorization: Bearer <INTEGRATION_API_KEY>`
+  - 개발 기본값: `.env.local`의 `INTEGRATION_API_KEY="test-integration-key"`
+- OpenAPI 명세 추가: `docs/api/integration-openapi.yaml`
+- 평가위원 신청서/PDF 확인 UX 보강
+  - PDF 문서 파일명을 버튼으로 노출
+  - 문서 선택 시 같은 뷰어에서 렌더링
+  - signed 상태 평가표는 본인 답변/코멘트/배점 확인 가능, 수정/재제출 불가
+- 결과 내보내기 보강
+  - PDF export를 Windows dev 환경에서 깨지던 `pdfkit` 기본 폰트 의존 없이 응답하도록 단순화
+  - Excel export 파일명을 ASCII 안전 값으로 변경
+- 집계/로그인 결함 수정
+  - 평가위원 OTP raw SQL 컬럼명 `is_active` -> `"isActive"`
+  - 집계가 실제 제출 구조 `scoresJson.perItem[*].weightedScore`를 반영하도록 수정
+- Docker Postgres 호스트 포트 충돌 회피
+  - `docker-compose.yml` Postgres 포트: `15432:5432`
+
+### 검증
+- `npx playwright test tests/integration-api.spec.ts --workers=1` -> 2 passed
+- `npx playwright test tests/eval-full-simulation.spec.ts --workers=1` -> 1 passed
+- `npx playwright test tests/eval-full-simulation.spec.ts tests/integration-api.spec.ts --workers=1` -> 3 passed
+- 변경 파일 한정 ESLint -> 0 errors
+- `npm run build` -> success
+
+### 남은 리스크
+- 전체 `npm run lint`는 기존 저장소 lint 오류 때문에 아직 실패한다.
+- `docs/api/integration-openapi.yaml`은 최소 연동 API 명세이며, 문서 업로드 연동 API와 webhook/callback 명세는 다음 단계로 남아 있다.
+- 결과 PDF는 안정 응답을 우선한 단순 PDF다. 한글 리포트 품질/서식은 별도 개선 필요.

@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useReducer, useRef } from 'react'
 import { ChevronLeft, ChevronRight, FileText, Minus, Plus } from 'lucide-react'
 import { Document, Page, pdfjs } from 'react-pdf'
 
@@ -329,6 +329,20 @@ export function PdfViewer({ documents }: PdfViewerProps) {
             </SelectContent>
           </Select>
         </div>
+
+        <div className="flex flex-wrap gap-1.5">
+          {pdfDocs.map((document) => (
+            <Button
+              key={document.id}
+              type="button"
+              variant={document.id === state.selectedDocumentId ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => handleDocumentSelect(document.id)}
+            >
+              {document.originalFilename}
+            </Button>
+          ))}
+        </div>
       </CardHeader>
 
       <CardContent
@@ -389,7 +403,7 @@ export function PdfViewer({ documents }: PdfViewerProps) {
                           pageNumber={pageNum}
                           scale={state.scale}
                           renderAnnotationLayer={false}
-                          renderTextLayer={false}
+                          renderTextLayer
                           loading={<Skeleton className="h-[420px] w-full" />}
                         />
                       ) : (

@@ -73,7 +73,6 @@ export default function EvalApplicationEvaluatePage() {
   const [documents, setDocuments] = useState<LoadResponse['application']['documents']>([])
   const [schema, setSchema] = useState<FormSchema | null>(null)
   const [answers, setAnswers] = useState<Record<string, unknown>>({})
-  const [version, setVersion] = useState(0)
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle')
   const [isSaving, setIsSaving] = useState(false)
   const [isSigned, setIsSigned] = useState(false)
@@ -133,7 +132,6 @@ export default function EvalApplicationEvaluatePage() {
       setDocuments(detail.application.documents)
       setSchema(parsedSchema.data)
       setAnswers(initialAnswers)
-      setVersion(initialVersion)
       setIsSigned(detail.submission?.submissionState === 'signed')
       answersRef.current = initialAnswers
       versionRef.current = initialVersion
@@ -179,7 +177,6 @@ export default function EvalApplicationEvaluatePage() {
 
         if (conflict.conflict?.draft) {
           setAnswers(conflict.conflict.draft.answersJson)
-          setVersion(conflict.conflict.draft.version)
           answersRef.current = conflict.conflict.draft.answersJson
           versionRef.current = conflict.conflict.draft.version
           dirtyRef.current = false
@@ -200,7 +197,6 @@ export default function EvalApplicationEvaluatePage() {
       }
 
       setAnswers(data.draft.answersJson)
-      setVersion(data.draft.version)
       answersRef.current = data.draft.answersJson
       versionRef.current = data.draft.version
       dirtyRef.current = false
@@ -376,6 +372,7 @@ export default function EvalApplicationEvaluatePage() {
               saveStatus={saveStatus}
               isSaving={isSaving}
               isSubmitDisabled={isSigned}
+              isReadOnly={isSigned}
             />
           </ResizablePanel>
         </ResizablePanelGroup>
@@ -396,6 +393,7 @@ export default function EvalApplicationEvaluatePage() {
               saveStatus={saveStatus}
               isSaving={isSaving}
               isSubmitDisabled={isSigned}
+              isReadOnly={isSigned}
             />
           </div>
         </div>

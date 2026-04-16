@@ -30,6 +30,7 @@ type EvaluationFormProps = {
   saveStatus: SaveStatus
   isSaving: boolean
   isSubmitDisabled?: boolean
+  isReadOnly?: boolean
 }
 
 function saveStatusLabel(status: SaveStatus) {
@@ -56,6 +57,7 @@ export function EvaluationForm({
   saveStatus,
   isSaving,
   isSubmitDisabled,
+  isReadOnly,
 }: EvaluationFormProps) {
   const sectionRefs = useRef<Map<string, HTMLDivElement>>(new Map())
   const [defaultSections] = useState(() => new Set(schema.sections.map((s) => s.id)))
@@ -256,6 +258,7 @@ export function EvaluationForm({
                               ) : null}
                               <Textarea
                                 id={item.id}
+                                aria-label={item.label}
                                 value={
                                   typeof answers[item.id] === 'string'
                                     ? String(answers[item.id])
@@ -268,6 +271,8 @@ export function EvaluationForm({
                                 maxLength={item.maxLength}
                                 placeholder="의견을 입력하세요"
                                 rows={4}
+                                readOnly={Boolean(isReadOnly)}
+                                disabled={Boolean(isReadOnly)}
                               />
                             </div>
                           )
@@ -288,6 +293,9 @@ export function EvaluationForm({
                                   <span className="ml-1 text-destructive">*</span>
                                 ) : null}
                               </Label>
+                              <span className="rounded bg-stone-100 px-1.5 py-0.5 text-xs text-stone-600">
+                                배점 {item.weight}
+                              </span>
                               {typeof currentValue === 'number' && (
                                 <span className="size-2 rounded-full bg-green-500" />
                               )}
@@ -299,7 +307,9 @@ export function EvaluationForm({
                             ) : null}
                             <RadioGroup
                               value={valueAsString}
+                              disabled={Boolean(isReadOnly)}
                               onValueChange={(value) => {
+                                if (isReadOnly) return
                                 onAnswerChange(item.id, Number(value))
                                 onFieldBlur()
                               }}
@@ -313,13 +323,30 @@ export function EvaluationForm({
                                     htmlFor={optionId}
                                     className="flex cursor-pointer items-center gap-2 rounded-md border px-3 py-2 text-sm transition hover:bg-stone-50"
                                   >
-                                    <RadioGroupItem id={optionId} value={String(option.score)} />
+                                    <RadioGroupItem
+                                      id={optionId}
+                                      value={String(option.score)}
+                                      disabled={Boolean(isReadOnly)}
+                                    />
                                     <span className="font-medium">{option.score}점</span>
                                     <span className="text-stone-600">{option.label}</span>
                                   </label>
                                 )
                               })}
                             </RadioGroup>
+                            {isReadOnly ? (
+                              <div className="sr-only">
+                                {item.options.map((option) => (
+                                  <input
+                                    key={`${item.id}-readonly-${option.score}`}
+                                    aria-label={option.label}
+                                    disabled
+                                    readOnly
+                                    value={option.score}
+                                  />
+                                ))}
+                              </div>
+                            ) : null}
                           </div>
                         )
                       })}
@@ -342,7 +369,7 @@ export function EvaluationForm({
             type="button"
             variant="outline"
             onClick={onSaveDraft}
-            disabled={isSaving}
+            disabled={isSaving || Boolean(isReadOnly)}
           >
             초안 저장
           </Button>
@@ -350,7 +377,7 @@ export function EvaluationForm({
             type="button"
             className="flex-1"
             onClick={onSubmit}
-            disabled={Boolean(isSubmitDisabled)}
+            disabled={Boolean(isSubmitDisabled) || Boolean(isReadOnly)}
           >
             최종 제출
           </Button>

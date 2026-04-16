@@ -128,7 +128,7 @@ export async function POST(request: Request) {
 
   // Prisma WASM 버그 우회: raw pg 직접 사용 (name + phone SQL 파라미터로 전달)
   const { rows } = await pgPool.query<{ id: string; name: string; phone: string }>(
-    'SELECT id, name, phone FROM committee_member WHERE name = $1 AND phone = ANY($2::text[]) AND is_active = TRUE LIMIT 1',
+    'SELECT id, name, phone FROM committee_member WHERE name = $1 AND phone = ANY($2::text[]) AND "isActive" = TRUE LIMIT 1',
     [name, [normalizedPhone, formatPhone(normalizedPhone)]],
   )
   const member = rows[0] ?? null
