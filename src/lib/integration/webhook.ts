@@ -18,24 +18,6 @@ function getWebhookUrl() {
   )
 }
 
-async function ensureDeliveryTable() {
-  await prisma.$executeRaw`
-    CREATE TABLE IF NOT EXISTS integration_webhook_delivery (
-      event_id TEXT PRIMARY KEY,
-      event_type TEXT NOT NULL,
-      url TEXT NOT NULL,
-      payload_json JSONB NOT NULL,
-      status TEXT NOT NULL,
-      attempts INTEGER NOT NULL DEFAULT 0,
-      last_status INTEGER,
-      last_error TEXT,
-      created_at TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      updated_at TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      delivered_at TIMESTAMP(3)
-    )
-  `
-}
-
 async function buildFinalizedPayload(sessionId: string) {
   const session = await prisma.evaluationSession.findUnique({
     where: { id: sessionId },
@@ -117,7 +99,6 @@ async function sendWebhookWithRetries(input: {
   const body = JSON.stringify(input.payload)
   const maxAttempts = input.maxAttempts ?? 3
 
-  await ensureDeliveryTable()
   await prisma.$executeRaw`
     INSERT INTO integration_webhook_delivery (event_id, event_type, url, payload_json, status, updated_at)
     VALUES (${input.payload.eventId}, ${input.payload.event}, ${input.url}, ${body}::jsonb, 'pending', CURRENT_TIMESTAMP)
@@ -193,8 +174,6 @@ export async function notifyIntegrationSessionFinalized(sessionId: string) {
 }
 
 export async function replayIntegrationWebhook(eventId: string) {
-  await ensureDeliveryTable()
-
   const rows = await prisma.$queryRaw<Array<{ url: string; payload_json: { eventId: string; event: string } }>>`
     SELECT url, payload_json
     FROM integration_webhook_delivery
@@ -216,8 +195,6 @@ export async function replayIntegrationWebhook(eventId: string) {
 }
 
 export async function listIntegrationWebhookDeliveries(limit = 50) {
-  await ensureDeliveryTable()
-
   const rows = await prisma.$queryRaw<
     Array<{
       event_id: string
@@ -258,8 +235,6 @@ export async function listIntegrationWebhookDeliveriesPage(input: {
   pageSize: number
   status?: string | null
 }) {
-  await ensureDeliveryTable()
-
   const offset = (input.page - 1) * input.pageSize
   const rows = input.status
     ? await prisma.$queryRaw<

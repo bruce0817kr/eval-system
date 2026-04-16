@@ -329,3 +329,22 @@ S3_REGION=us-east-1
   - `npx playwright test tests/integration-api.spec.ts tests/eval-api-coverage.spec.ts tests/eval-full-simulation.spec.ts --workers=1` -> 21 passed
   - `npm run lint` -> success
   - `npm run build` -> success
+
+### 2026-04-16 migration/runtime bootstrap 정리
+- runtime table bootstrap 제거
+  - `src/lib/integration/webhook.ts`에서 `CREATE TABLE IF NOT EXISTS` 제거
+  - delivery table은 migration으로 관리
+- package scripts 추가
+  - `npm run db:generate`
+  - `npm run db:migrate:deploy`
+- 로컬 DB 처리
+  - 기존 non-empty DB라 `npx prisma migrate deploy`는 `P3005` 발생
+  - 현재 로컬 DB는 `npx prisma migrate resolve --applied 202604160001_add_integration_webhook_delivery`로 적용 기록 처리함
+- 배포 절차
+  - 신규/배포 DB에서는 `DATABASE_URL=<...> npm run db:migrate:deploy`
+  - 이후 `npm run db:generate`, `npm run build`
+- 검증
+  - `npx playwright test tests/eval-full-simulation.spec.ts tests/integration-api.spec.ts --workers=1` -> 3 passed
+  - `npm run lint` -> success
+  - `npm run build` -> success
+  - `npm run db:generate` -> success
