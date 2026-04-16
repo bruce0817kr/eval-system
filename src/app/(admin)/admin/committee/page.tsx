@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   Edit,
   Plus,
@@ -73,7 +73,7 @@ export default function AdminCommitteePage() {
 
   const totalPages = useMemo(() => Math.max(1, Math.ceil(total / PAGE_SIZE)), [total])
 
-  const fetchMembers = async () => {
+  const fetchMembers = useCallback(async () => {
     setIsLoading(true)
     setErrorMessage(null)
 
@@ -107,11 +107,11 @@ export default function AdminCommitteePage() {
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [page, search, statusFilter])
 
   useEffect(() => {
     void fetchMembers()
-  }, [page, search, statusFilter])
+  }, [fetchMembers])
 
   useEffect(() => {
     setPage(1)

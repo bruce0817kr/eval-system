@@ -99,21 +99,21 @@ export const test = base.extend<{
   evalSessionApplicationsPage: EvalSessionApplicationsPage
   evalEvaluationPage: EvalEvaluationPage
 }>({
-  evalLoginPage: async ({ page }, use) => {
+  evalLoginPage: async ({ page }, fixtureUse) => {
     const evalLoginPage = new EvalLoginPage(page)
-    await use(evalLoginPage)
+    await fixtureUse(evalLoginPage)
   },
-  evalSessionsPage: async ({ page }, use) => {
+  evalSessionsPage: async ({ page }, fixtureUse) => {
     const evalSessionsPage = new EvalSessionsPage(page)
-    await use(evalSessionsPage)
+    await fixtureUse(evalSessionsPage)
   },
-  evalSessionApplicationsPage: async ({ page }, use) => {
+  evalSessionApplicationsPage: async ({ page }, fixtureUse) => {
     const evalSessionApplicationsPage = new EvalSessionApplicationsPage(page)
-    await use(evalSessionApplicationsPage)
+    await fixtureUse(evalSessionApplicationsPage)
   },
-  evalEvaluationPage: async ({ page }, use) => {
+  evalEvaluationPage: async ({ page }, fixtureUse) => {
     const evalEvaluationPage = new EvalEvaluationPage(page)
-    await use(evalEvaluationPage)
+    await fixtureUse(evalEvaluationPage)
   },
 })
 

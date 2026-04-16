@@ -216,3 +216,15 @@ S3_REGION=us-east-1
 - 전체 `npm run lint`는 기존 저장소 lint 오류 때문에 아직 실패한다.
 - `docs/api/integration-openapi.yaml`은 최소 연동 API 명세이며, 문서 업로드 연동 API와 webhook/callback 명세는 다음 단계로 남아 있다.
 - 결과 PDF는 안정 응답을 우선한 단순 PDF다. 한글 리포트 품질/서식은 별도 개선 필요.
+
+### 2026-04-16 추가 정리
+- untracked 임시파일/리포트/도구 상태 정리
+  - `playwright-report/`, `test-results/`, `.omx/`, `.planning/`, `.claude/`, 임시 SQL/업로드/로그 파일 제거
+  - 유지 대상: `tests/eval-api-coverage.spec.ts`는 API 회귀 테스트로 커밋
+- 전체 lint 오류 해결
+  - `npm run lint` -> 0 errors
+  - 남던 hook dependency, `module` 변수명, 테스트 fixture `use` 오탐, unused import/variable 정리
+- 검증
+  - `npm run lint` -> success
+  - `npx playwright test tests/eval-full-simulation.spec.ts tests/integration-api.spec.ts tests/eval-api-coverage.spec.ts --workers=1` -> 21 passed
+  - `npm run build` -> success

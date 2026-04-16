@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 
 import { Badge } from '@/components/ui/badge'
@@ -49,7 +49,7 @@ export default function EvalSessionApplicationsPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  const loadApplications = async () => {
+  const loadApplications = useCallback(async () => {
     setError(null)
     setIsLoading(true)
 
@@ -74,11 +74,11 @@ export default function EvalSessionApplicationsPage() {
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [sessionId])
 
   useEffect(() => {
     void loadApplications()
-  }, [sessionId])
+  }, [loadApplications])
 
   const sorted = useMemo(
     () => [...items].sort((a, b) => a.evaluationOrder - b.evaluationOrder),

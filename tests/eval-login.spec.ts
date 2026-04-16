@@ -1,10 +1,8 @@
 import { test, expect } from './page-objects'
-import { getOTPFromRedis, waitForOTP, clearRedisOTP } from './helpers'
+import { waitForOTP, clearRedisOTP } from './helpers'
 
 const EVALUATOR_PHONE = '010-1111-1111'
 const EVALUATOR_NAME = '김평가'
-const SESSION_ID = 'ses001'
-const APPLICATION_ID = 'app001'
 
 test.describe('평가위원 로그인', () => {
   test.beforeEach(async () => {

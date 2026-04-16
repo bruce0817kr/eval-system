@@ -1,15 +1,20 @@
-"use client";
+"use client"
 
-import { useParams } from "next/navigation";
-import { useEffect, useState } from "react";
-import { Button } from "@/components/ui/button";
+import { useCallback, useEffect, useState } from "react"
+import Link from "next/link"
+import { useParams } from "next/navigation"
+import { RefreshCcwIcon } from "lucide-react"
+
+import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from "@/components/ui/card";
+} from "@/components/ui/card"
+import { Skeleton } from "@/components/ui/skeleton"
 import {
   Table,
   TableBody,
@@ -17,86 +22,65 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
-import { RefreshCcwIcon } from "lucide-react";
-import Link from "next/link";
+} from "@/components/ui/table"
+
+type AggregationItem = {
+  id: string
+  triggerType: string
+  applicationsCount: number
+  successCount: number
+  errorCount: number
+  computedAt: string
+  computedBy: {
+    name: string
+    email: string
+  } | null
+}
+
+function triggerTypeLabel(type: string) {
+  if (type === "manual") return "수동"
+  if (type === "auto") return "자동"
+  if (type === "reopen") return "재개방"
+  if (type === "finalize") return "확정"
+  return type
+}
 
 export default function AdminSessionAggregationsPage() {
-  const params = useParams<{ sessionId: string }>();
-  const sessionId = params.sessionId;
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [aggregations, setAggregations] = useState<
-    {
-      id: string;
-      triggerType: string;
-      triggerReason: string | null;
-      applicationsCount: number;
-      successCount: number;
-      errorCount: number;
-      resultJson: {
-        results?: Array<{
-          applicationId: string;
-          companyName?: string;
-          finalScore?: number | null;
-          rank?: number | null;
-          error?: string | null;
-        }>;
-        computedAt?: string;
-        error?: string;
-      } | null;
-      computedAt: string;
-      computedBy: {
-        id: string;
-        name: string;
-        email: string;
-      } | null;
-    }[]
-  >([]);
+  const params = useParams<{ sessionId: string }>()
+  const sessionId = params.sessionId
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [aggregations, setAggregations] = useState<AggregationItem[]>([])
 
-  const fetchAggregations = () => {
-    if (!sessionId) return;
+  const fetchAggregations = useCallback(async () => {
+    if (!sessionId) return
 
-    setLoading(true);
-    setError(null);
+    setLoading(true)
+    setError(null)
 
-    fetch(`/api/admin/sessions/${sessionId}/aggregations`)
-      .then(async (res) => {
-        if (!res.ok) {
-          const errorData = await res.json();
-          throw new Error(errorData.error || "Failed to fetch aggregations");
-        }
-        return res.json();
-      })
-      .then((data) => {
-        setAggregations(data);
-        setLoading(false);
-      })
-      .catch((err) => {
-        console.error("Failed to fetch aggregations:", err);
-        setError(err.message);
-        setLoading(false);
-      });
-  };
+    try {
+      const response = await fetch(`/api/admin/sessions/${sessionId}/aggregations`)
+      if (!response.ok) {
+        const data = (await response.json().catch(() => null)) as { error?: string } | null
+        throw new Error(data?.error ?? "집계 이력을 불러오지 못했습니다.")
+      }
+
+      const data = (await response.json()) as AggregationItem[]
+      setAggregations(data)
+    } catch (fetchError) {
+      setError(fetchError instanceof Error ? fetchError.message : "집계 이력을 불러오지 못했습니다.")
+    } finally {
+      setLoading(false)
+    }
+  }, [sessionId])
 
   useEffect(() => {
-    fetchAggregations();
-  }, [sessionId]);
+    const timer = window.setTimeout(() => {
+      void fetchAggregations()
+    }, 0)
 
-  const getTriggerTypeLabel = (type: string) => {
-    switch (type) {
-      case "manual":
-        return "수동";
-      case "auto":
-        return "자동";
-      case "reopen":
-        return "재개방 후";
-      default:
-        return type;
-    }
-  };
+    return () => window.clearTimeout(timer)
+  }, [fetchAggregations])
 
   if (loading) {
     return (
@@ -105,7 +89,7 @@ export default function AdminSessionAggregationsPage() {
         <Skeleton className="h-28 w-full" />
         <Skeleton className="h-72 w-full" />
       </div>
-    );
+    )
   }
 
   if (error) {
@@ -116,110 +100,86 @@ export default function AdminSessionAggregationsPage() {
           <CardDescription>{error}</CardDescription>
         </CardHeader>
         <CardContent>
-          <Button
-            variant="outline"
-            onClick={() => fetchAggregations()}
-          >
+          <Button variant="outline" onClick={() => void fetchAggregations()}>
             <RefreshCcwIcon className="size-4" />
             새로고침
           </Button>
         </CardContent>
       </Card>
-    );
+    )
   }
 
   if (aggregations.length === 0) {
     return (
       <Card>
         <CardHeader>
-          <CardTitle>집계 내역</CardTitle>
+          <CardTitle>집계 이력</CardTitle>
           <CardDescription>
-            아직 실행된 집계가 없습니다. 평가가 모두 완료된 후 "집계 실행" 버튼을 눌러주세요.
+            집계 이력이 없습니다. 평가가 완료되면 결과 탭에서 집계를 실행하세요.
           </CardDescription>
         </CardHeader>
-        <CardContent>
-          <p className="text-sm text-muted-foreground">
-            집계 내역이 여기에 표시됩니다.
-          </p>
-        </CardContent>
       </Card>
-    );
+    )
   }
 
   return (
-    <>
-      <Card>
-        <CardHeader>
-          <div className="flex justify-between items-center">
-            <CardTitle>집계 내역</CardTitle>
-            <Link
-              href={`/admin/sessions/${sessionId}`}
-              className="text-sm text-muted-foreground hover:underline"
-            >
-              ← 회차 상세로 돌아가기
-            </Link>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="overflow-x-auto">
-            <Table className="w-full">
-              <TableHeader>
-                <TableRow>
-                  <TableHead>일시</TableHead>
-                  <TableHead>유형</TableHead>
-                  <TableHead>총 기업 수</TableHead>
-                  <TableHead>성공</TableHead>
-                  <TableHead>실패</TableHead>
-                  <TableHead>실행자</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {aggregations.map((agg) => (
-                  <TableRow key={agg.id}>
-                    <TableCell>
-                      {new Date(agg.computedAt).toLocaleString("ko-KR", {
-                        year: "numeric",
-                        month: "2-digit",
-                        day: "2-digit",
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="secondary">{getTriggerTypeLabel(
-                        agg.triggerType
-                      )}</Badge>
-                    </TableCell>
-                    <TableCell>{agg.applicationsCount}</TableCell>
-                    <TableCell>
-                      <Badge variant="default">{agg.successCount}</Badge>
-                    </TableCell>
-                    <TableCell>
-                      {agg.errorCount > 0 ? (
-                        <Badge variant="destructive">{agg.errorCount}</Badge>
-                      ) : (
-                        <Badge variant="secondary">0</Badge>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      {agg.computedBy ? (
-                        <>
-                          <div className="font-medium">{agg.computedBy.name}</div>
-                          <div className="text-xs text-muted-foreground">
-                            {agg.computedBy.email}
-                          </div>
-                        </>
-                      ) : (
-                        <span className="text-muted-foreground">시스템</span>
-                      )}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-        </CardContent>
-      </Card>
-    </>
-  );
+    <Card>
+      <CardHeader>
+        <div className="flex items-center justify-between gap-3">
+          <CardTitle>집계 이력</CardTitle>
+          <Link
+            href={`/admin/sessions/${sessionId}`}
+            className="text-sm text-muted-foreground hover:underline"
+          >
+            세션 상세로 돌아가기
+          </Link>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>일시</TableHead>
+              <TableHead>유형</TableHead>
+              <TableHead>기업 수</TableHead>
+              <TableHead>성공</TableHead>
+              <TableHead>실패</TableHead>
+              <TableHead>실행자</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {aggregations.map((aggregation) => (
+              <TableRow key={aggregation.id}>
+                <TableCell>{new Date(aggregation.computedAt).toLocaleString("ko-KR")}</TableCell>
+                <TableCell>
+                  <Badge variant="secondary">{triggerTypeLabel(aggregation.triggerType)}</Badge>
+                </TableCell>
+                <TableCell>{aggregation.applicationsCount}</TableCell>
+                <TableCell>
+                  <Badge>{aggregation.successCount}</Badge>
+                </TableCell>
+                <TableCell>
+                  <Badge variant={aggregation.errorCount > 0 ? "destructive" : "secondary"}>
+                    {aggregation.errorCount}
+                  </Badge>
+                </TableCell>
+                <TableCell>
+                  {aggregation.computedBy ? (
+                    <div>
+                      <div className="font-medium">{aggregation.computedBy.name}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {aggregation.computedBy.email}
+                      </div>
+                    </div>
+                  ) : (
+                    <span className="text-muted-foreground">시스템</span>
+                  )}
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </CardContent>
+    </Card>
+  )
 }

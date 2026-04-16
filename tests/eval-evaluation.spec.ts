@@ -70,7 +70,6 @@ test.describe('평가 플로우 E2E', () => {
 
   test('평가 목록 → 세션 카드 클릭 → 신청 목록 표시', async ({
     evalLoginPage,
-    evalSessionsPage,
     page,
   }) => {
     // 1. 로그인

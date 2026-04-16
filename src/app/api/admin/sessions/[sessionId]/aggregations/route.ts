@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { getAdminSession } from '@/lib/auth/jwt'
-import { AggregationRun } from '@/generated/prisma/client'
 
 export async function GET(
   request: NextRequest,

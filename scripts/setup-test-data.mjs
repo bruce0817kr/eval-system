@@ -1,12 +1,5 @@
 import { execSync } from 'child_process'
-import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'fs'
-import { join, dirname } from 'path'
-import { fileURLToPath } from 'url'
-import { createHash, randomBytes } from 'crypto'
-import { S3Client, PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3'
-import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
-
-const __dirname = dirname(fileURLToPath(import.meta.url))
+import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3'
 
 const config = {
   databaseUrl: process.env.DATABASE_URL || 'postgresql://eval:eval_secret@localhost:5433/eval_db',
@@ -174,7 +167,7 @@ async function setupTestData() {
   execPrisma(`DELETE FROM committee_member WHERE id = '${testData.member.id}'`)
 
   console.log('\n3. 평가위원 생성...')
-  const memberResult = execPrisma(`
+  execPrisma(`
     INSERT INTO committee_member (id, name, phone, organization, position, field, is_active, created_at)
     VALUES ('${testData.member.id}', '${testData.member.name}', '${testData.member.phone}', '${testData.member.organization}', '${testData.member.position}', '${testData.member.field}', true, NOW())
     RETURNING id

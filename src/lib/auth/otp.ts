@@ -38,15 +38,15 @@ async function loadRedisModule(): Promise<RedisModule | null> {
       "specifier",
       'return import(specifier)'
     ) as (specifier: string) => Promise<unknown>
-    const module = await dynamicImport("ioredis")
+    const redisModule = await dynamicImport("ioredis")
 
     if (
-      typeof module === "object" &&
-      module !== null &&
-      "default" in module &&
-      typeof module.default === "function"
+      typeof redisModule === "object" &&
+      redisModule !== null &&
+      "default" in redisModule &&
+      typeof redisModule.default === "function"
     ) {
-      return module as RedisModule
+      return redisModule as RedisModule
     }
 
     return null

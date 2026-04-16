@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Check, Search, Star } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
@@ -46,7 +46,7 @@ export function CommitteeAssignDialog({
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
-  const fetchMembers = async (search: string) => {
+  const fetchMembers = useCallback(async (search: string) => {
     setIsLoading(true)
 
     try {
@@ -63,7 +63,7 @@ export function CommitteeAssignDialog({
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [alreadyAssignedIds])
 
   useEffect(() => {
     if (open) {
@@ -73,13 +73,13 @@ export function CommitteeAssignDialog({
       setSearchInput('')
       void fetchMembers('')
     }
-  }, [open])
+  }, [fetchMembers, open])
 
   useEffect(() => {
     if (!open) return
     const timer = setTimeout(() => void fetchMembers(searchInput), 300)
     return () => clearTimeout(timer)
-  }, [searchInput])
+  }, [fetchMembers, open, searchInput])
 
   const toggleSelect = (id: string) => {
     setSelectedIds((prev) => {

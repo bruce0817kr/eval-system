@@ -30,15 +30,15 @@ async function getRedisClient(): Promise<RedisLike | null> {
       'specifier',
       'return import(specifier)',
     ) as (specifier: string) => Promise<unknown>
-    const module = await dynamicImport('ioredis')
+    const redisModule = await dynamicImport('ioredis')
 
     if (
-      typeof module === 'object' &&
-      module !== null &&
-      'default' in module &&
-      typeof module.default === 'function'
+      typeof redisModule === 'object' &&
+      redisModule !== null &&
+      'default' in redisModule &&
+      typeof redisModule.default === 'function'
     ) {
-      const Redis = (module as RedisModule).default
+      const Redis = (redisModule as RedisModule).default
       redisClient = new Redis(redisUrl, {
         lazyConnect: true,
         maxRetriesPerRequest: null,
@@ -110,4 +110,3 @@ export async function rateLimitAdminLogin(
 
   return inMemoryRateLimit(ip)
 }
-

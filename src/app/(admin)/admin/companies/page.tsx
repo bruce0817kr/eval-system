@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Edit, Plus, Search, Trash2 } from 'lucide-react'
 
 import {
@@ -57,7 +57,7 @@ export default function AdminCompaniesPage() {
     [total],
   )
 
-  const fetchCompanies = async () => {
+  const fetchCompanies = useCallback(async () => {
     setIsLoading(true)
     setErrorMessage(null)
 
@@ -87,11 +87,11 @@ export default function AdminCompaniesPage() {
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [page, search])
 
   useEffect(() => {
     void fetchCompanies()
-  }, [page, search])
+  }, [fetchCompanies])
 
   useEffect(() => {
     setPage(1)
