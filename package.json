@@ -10,6 +10,8 @@
     "db:generate": "prisma generate",
     "db:migrate:deploy": "prisma migrate deploy",
     "api:spec:check": "node scripts/validate-openapi.mjs",
+    "integration:smoke": "node scripts/integration-smoke-test.mjs",
+    "integration:webhook:sample": "node scripts/send-finalized-webhook-sample.mjs",
     "test": "playwright test",
     "test:ui": "playwright test --ui",
     "test:headed": "playwright test --headed"

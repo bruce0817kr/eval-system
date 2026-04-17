@@ -418,3 +418,19 @@ S3_REGION=us-east-1
   - `npm run api:spec:check` -> success
   - `npm run lint` -> success
   - `npm run build` -> success
+
+### 2026-04-17 연동 PoC 실행 도구 추가
+- 스크립트 추가
+  - `npm run integration:smoke`
+    - `EVAL_BASE_URL`, `INTEGRATION_API_KEY`로 health/session/application/document/results 왕복 확인
+  - `npm run integration:webhook:sample`
+    - `WEBHOOK_URL`, `INTEGRATION_WEBHOOK_HMAC_SECRET`로 signed finalized webhook 샘플 발송
+- 문서 추가
+  - `docs/api/integration-examples.md`에 smoke test와 webhook sample sender 실행법 추가
+- 검증
+  - `node --check scripts/send-finalized-webhook-sample.mjs` -> success
+  - `node --check scripts/integration-smoke-test.mjs` -> success
+  - `npm run api:spec:check` -> success
+  - `npx playwright test tests/integration-api.spec.ts tests/eval-api-coverage.spec.ts tests/eval-full-simulation.spec.ts --workers=1` -> 22 passed
+  - `npm run lint` -> success
+  - `npm run build` -> success

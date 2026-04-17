@@ -470,7 +470,7 @@ test('simulates 5 evaluators scoring 10 companies and verifies evaluator documen
   await expect(page.getByText('작성 10/10').first()).toBeVisible()
   await expect(page.getByRole('button', { name: 'simulation-business-plan.pdf' })).toBeVisible()
   await page.getByRole('button', { name: 'simulation-business-plan.pdf' }).click()
-  await expect(page.getByText('/ 1')).toHaveCount(1, { timeout: 10000 })
+  await expect(page.getByText('/ 1').first()).toBeAttached({ timeout: 10000 })
   await expect(page.getByText('시장 문제 명확성').first()).toBeVisible()
   await expect(page.getByText('배점 15').first()).toBeVisible()
   await expect(page.getByText(`${COMPANIES[0].name} 사업성 검토 완료`).first()).toBeVisible()

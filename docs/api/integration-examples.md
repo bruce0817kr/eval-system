@@ -104,6 +104,36 @@ curl -X POST "$BASE_URL/api/v1/integration/webhooks/evaluation.finalized:ext-not
   -H "Authorization: Bearer $TOKEN"
 ```
 
+## 6. Run Smoke Test
+
+Use this after staging URLs and tokens are configured:
+
+```bash
+EVAL_BASE_URL=https://eval-staging.example.go.kr \
+INTEGRATION_API_KEY=<token> \
+npm run integration:smoke
+```
+
+The script checks:
+
+- integration health
+- session upsert
+- application/company upsert
+- PDF document upload
+- results read
+
+## 7. Send Sample Finalized Webhook
+
+Use this to verify the business-management webhook receiver before connecting the real evaluator.
+
+```bash
+WEBHOOK_URL=https://biz-staging.example.go.kr/api/v1/integration/webhooks/evaluation-finalized \
+INTEGRATION_WEBHOOK_HMAC_SECRET=<shared-secret> \
+npm run integration:webhook:sample
+```
+
+The script sends `X-Event-Id` and `X-Signature` headers using the same signing rule as the evaluator.
+
 ## Finalized Webhook
 
 When a session is finalized, the app sends a `POST` to `INTEGRATION_WEBHOOK_URL`.
