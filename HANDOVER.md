@@ -434,3 +434,22 @@ S3_REGION=us-east-1
   - `npx playwright test tests/integration-api.spec.ts tests/eval-api-coverage.spec.ts tests/eval-full-simulation.spec.ts --workers=1` -> 22 passed
   - `npm run lint` -> success
   - `npm run build` -> success
+
+### 2026-04-17 일시 중단 지점
+- 현재 상태
+  - 선정평가 시스템 쪽 integration API, OpenAPI, smoke test, webhook sample sender 준비 완료
+  - 사업관리 시스템 staging endpoint, token, webhook URL/secret 준비 대기
+- 재개 조건
+  - 사업관리 시스템의 staging base URL
+  - 선정평가 호출용 `INTEGRATION_API_KEY`
+  - 사업관리 webhook URL
+  - `INTEGRATION_WEBHOOK_HMAC_SECRET`
+  - 실제 `program`, `participant`, `support_case`, `attachment` payload 샘플
+- 재개 시 첫 작업
+  - `EVAL_BASE_URL=<staging> INTEGRATION_API_KEY=<token> npm run integration:smoke`
+  - `WEBHOOK_URL=<biz-webhook> INTEGRATION_WEBHOOK_HMAC_SECRET=<secret> npm run integration:webhook:sample`
+  - 실제 payload 샘플 기준 field mapping 확인
+- 알려진 후순위
+  - PDF 결과 보고서 품질 개선
+  - webhook delivery UI 편의 기능 추가
+  - 실제 운영 reverse proxy 50MB body limit 확인
