@@ -403,3 +403,18 @@ S3_REGION=us-east-1
   - `npm run api:spec:check` -> success
   - `npm run lint` -> success
   - `npm run build` -> success
+
+### 2026-04-17 사업관리 확인사항 추가 반영
+- PDF 업로드 제한 구현
+  - integration document upload 최대 50MB
+  - 초과 시 `422` + `{ status: "failed", message: "PDF document exceeds the 50MB limit" }`
+- webhook receiver dedup 요구사항 문서화
+  - 사업관리 시스템은 `X-Event-Id`를 저장하고 중복 이벤트를 무시해야 함
+- HMAC 환경변수명 정리
+  - 문서 기준: `INTEGRATION_WEBHOOK_HMAC_SECRET`
+- 검증
+  - `npx playwright test tests/integration-api.spec.ts --workers=1` -> 3 passed
+  - `npx playwright test tests/integration-api.spec.ts tests/eval-api-coverage.spec.ts tests/eval-full-simulation.spec.ts --workers=1` -> 22 passed
+  - `npm run api:spec:check` -> success
+  - `npm run lint` -> success
+  - `npm run build` -> success

@@ -176,6 +176,34 @@ test.describe('business-management integration REST API', () => {
     expect(duplicateDocumentBody.status).toBe('ok')
     expect(duplicateDocumentBody.data.document.id).toBe(documentBody.data.document.id)
 
+    const oversizedDocumentResponse = await request.post(
+      `/api/v1/integration/applications/${EXTERNAL_APPLICATION_ID}/documents`,
+      {
+        headers: {
+          Authorization: AUTH_HEADER,
+          'Idempotency-Key': `${documentIdempotencyKey}-oversized`,
+        },
+        multipart: {
+          file: {
+            name: 'oversized-business-plan.pdf',
+            mimeType: 'application/pdf',
+            buffer: Buffer.concat([
+              Buffer.from('%PDF-1.4\n', 'utf8'),
+              Buffer.alloc(50 * 1024 * 1024 + 1),
+            ]),
+          },
+          docType: 'business_plan',
+        },
+      },
+    )
+    expect(oversizedDocumentResponse.status()).toBe(422)
+    expect(await oversizedDocumentResponse.json()).toEqual(
+      expect.objectContaining({
+        status: 'failed',
+        message: 'PDF document exceeds the 50MB limit',
+      }),
+    )
+
     const resultsResponse = await request.get(
       `/api/v1/integration/sessions/${EXTERNAL_SESSION_ID}/results`,
       {

@@ -76,6 +76,7 @@ curl -X PUT "$BASE_URL/api/v1/integration/sessions/ext-notice-2026-001/applicati
 ## 3. Upload Application PDF
 
 Use `Idempotency-Key` for retry-safe uploads. Reusing the same key for the same application returns the original document.
+PDF uploads are limited to 50MB.
 
 ```bash
 curl -X POST "$BASE_URL/api/v1/integration/applications/ext-application-0001/documents" \
@@ -116,6 +117,7 @@ X-Signature: sha256=<hmac>
 ```
 
 `X-Signature` is an HMAC-SHA256 over the raw JSON body using `INTEGRATION_WEBHOOK_HMAC_SECRET`; if unset, `AUTH_SECRET` is used.
+The receiver must store `X-Event-Id` and ignore duplicate event ids so retries do not update the same support case more than once.
 
 Payload:
 

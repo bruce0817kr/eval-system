@@ -486,7 +486,7 @@ components:
         file:
           type: string
           format: binary
-          description: PDF file to attach to the application.
+          description: PDF file to attach to the application. Maximum size is 50MB.
         docType:
           type: string
           enum: [business_plan, supplementary]

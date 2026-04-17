@@ -11,6 +11,7 @@ import {
 } from '@/lib/integration/auth'
 
 const docTypeSchema = z.enum(['business_plan', 'supplementary']).default('business_plan')
+const MAX_DOCUMENT_BYTES = 50 * 1024 * 1024
 
 type RouteContext = {
   params: Promise<{ externalApplicationId: string }>
@@ -88,6 +89,13 @@ export async function POST(request: Request, context: RouteContext) {
 
   if (!isPdf) {
     return integrationError('UNSUPPORTED_FILE_TYPE', 'Only PDF documents are supported', 422)
+  }
+
+  if (file.size > MAX_DOCUMENT_BYTES) {
+    return integrationError('FILE_TOO_LARGE', 'PDF document exceeds the 50MB limit', 422, {
+      maxBytes: MAX_DOCUMENT_BYTES,
+      actualBytes: file.size,
+    })
   }
 
   const buffer = Buffer.from(await file.arrayBuffer())
