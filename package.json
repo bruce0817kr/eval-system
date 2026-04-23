@@ -12,6 +12,8 @@
     "api:spec:check": "node scripts/validate-openapi.mjs",
     "integration:smoke": "node scripts/integration-smoke-test.mjs",
     "integration:webhook:sample": "node scripts/send-finalized-webhook-sample.mjs",
+    "platform:dev": "powershell -ExecutionPolicy Bypass -File .\\scripts\\platform-dev.ps1",
+    "platform:test": "powershell -ExecutionPolicy Bypass -File .\\scripts\\platform-test.ps1",
     "test": "playwright test",
     "test:ui": "playwright test --ui",
     "test:headed": "playwright test --headed"
