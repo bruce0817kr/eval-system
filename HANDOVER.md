@@ -453,3 +453,21 @@ S3_REGION=us-east-1
   - PDF 결과 보고서 품질 개선
   - webhook delivery UI 편의 기능 추가
   - 실제 운영 reverse proxy 50MB body limit 확인
+
+### 2026-04-23 로컬 재개 검증 및 테스트 데이터 스크립트 복구
+- 로컬 PoC 재개 순서 검증
+  - `localhost:3003/api/health` -> 200, database connected
+  - `npm run integration:smoke` -> health/session/application/document/results 왕복 성공
+  - `WEBHOOK_URL=http://127.0.0.1:3999/integration-webhook/ INTEGRATION_WEBHOOK_HMAC_SECRET=local-smoke-secret node scripts/send-finalized-webhook-sample.mjs` -> local receiver 기준 200, `X-Event-Id`/`X-Signature`/payload 수신 확인
+- `scripts/setup-test-data.mjs` 복구
+  - raw `psql` 호출을 `execFileSync` 인자 배열 기반으로 변경해 SQL quoting 오류와 숨겨진 실패 제거
+  - Prisma 7 현재 물리 컬럼명(`"sessionId"`, `"applicationId"`, `"committeeMemberId"` 등)에 맞게 cleanup/insert SQL 수정
+  - `session_committee_assignment.id` 명시 삽입
+  - MinIO alias 의존(`mc ls minio/`) 제거, S3 `HeadBucket`/`CreateBucket` API로 bucket 확인
+- 검증
+  - `node --check scripts/setup-test-data.mjs` -> success
+  - `DATABASE_URL=postgresql://eval:eval_secret@localhost:15432/eval_db S3_ENDPOINT=http://localhost:9000 S3_ACCESS_KEY=minioadmin S3_SECRET_KEY=minioadmin S3_BUCKET=eval-documents S3_REGION=us-east-1 node scripts/setup-test-data.mjs` -> success, 테스트 PDF 업로드 성공
+  - `npx playwright test tests/integration-api.spec.ts tests/eval-api-coverage.spec.ts tests/eval-full-simulation.spec.ts --workers=1` -> 21 passed, 1 skipped
+- 다음 작업
+  - 사업관리 시스템 staging base URL/token/webhook URL/HMAC secret/실제 payload 샘플을 받으면 staging 대상으로 `integration:smoke`와 webhook sample을 실행
+  - 실제 `program`, `participant`, `support_case`, `attachment` payload 기준 field mapping 확인

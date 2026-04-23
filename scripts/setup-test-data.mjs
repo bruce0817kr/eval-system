@@ -1,5 +1,10 @@
-import { execSync } from 'child_process'
-import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3'
+import { execFileSync } from 'child_process'
+import {
+  CreateBucketCommand,
+  HeadBucketCommand,
+  PutObjectCommand,
+  S3Client,
+} from '@aws-sdk/client-s3'
 
 const config = {
   databaseUrl: process.env.DATABASE_URL || 'postgresql://eval:eval_secret@localhost:5433/eval_db',
@@ -46,21 +51,16 @@ const s3Client = new S3Client({
 })
 
 function execPrisma(query) {
-  const escaped = query.replace(/"/g, '\\"')
-  try {
-    const result = execSync(
-      `docker exec eval-postgres psql -U eval -d eval_db -c "${escaped}"`,
-      { encoding: 'utf8' },
-    )
-    return result
-  } catch (e) {
-    return e.stdout || e.message
-  }
+  return execFileSync(
+    'docker',
+    ['exec', 'eval-postgres', 'psql', '-U', 'eval', '-d', 'eval_db', '-v', 'ON_ERROR_STOP=1', '-c', query],
+    { encoding: 'utf8' },
+  )
 }
 
 function checkPrismaConnection() {
   try {
-    execSync('docker exec eval-postgres psql -U eval -d eval_db -c "SELECT 1;"', {
+    execFileSync('docker', ['exec', 'eval-postgres', 'psql', '-U', 'eval', '-d', 'eval_db', '-c', 'SELECT 1;'], {
       encoding: 'utf8',
     })
     return true
@@ -69,14 +69,17 @@ function checkPrismaConnection() {
   }
 }
 
-function checkS3Connection() {
+async function checkS3Connection() {
   try {
-    execSync(
-      `docker exec eval-minio mc ls minio/`,
-      { encoding: 'utf8' },
-    )
+    await s3Client.send(new HeadBucketCommand({ Bucket: config.s3Bucket }))
     return true
-  } catch {
+  } catch (error) {
+    const status = error?.$metadata?.httpStatusCode
+    if (status === 404) {
+      await s3Client.send(new CreateBucketCommand({ Bucket: config.s3Bucket }))
+      return true
+    }
+
     return false
   }
 }
@@ -146,7 +149,7 @@ async function setupTestData() {
 
   console.log('1. 연결 확인...')
   const dbOk = checkPrismaConnection()
-  const s3Ok = checkS3Connection()
+  const s3Ok = await checkS3Connection()
   console.log(`   PostgreSQL: ${dbOk ? '✅ 연결됨' : '❌ 연결 실패'}`)
   console.log(`   MinIO S3: ${s3Ok ? '✅ 연결됨' : '❌ 연결 실패'}`)
 
@@ -156,19 +159,23 @@ async function setupTestData() {
   }
 
   console.log('\n2. 기존 테스트 데이터 정리...')
-  execPrisma(`DELETE FROM evaluation_draft WHERE "committeeMemberId" = '${testData.member.id}'`)
-  execPrisma(`DELETE FROM evaluation_submission WHERE "committeeMemberId" = '${testData.member.id}'`)
-  execPrisma(`DELETE FROM application_document WHERE application_id IN (SELECT id FROM application WHERE session_id = '${testData.session.id}')`)
-  execPrisma(`DELETE FROM application WHERE session_id = '${testData.session.id}'`)
+  execPrisma(`DELETE FROM signature_artifact WHERE "submissionId" IN (SELECT id FROM evaluation_submission WHERE "committeeMemberId" = '${testData.member.id}' OR "sessionId" = '${testData.session.id}')`)
+  execPrisma(`DELETE FROM evaluation_draft WHERE "committeeMemberId" = '${testData.member.id}' OR "sessionId" = '${testData.session.id}'`)
+  execPrisma(`DELETE FROM evaluation_submission WHERE "committeeMemberId" = '${testData.member.id}' OR "sessionId" = '${testData.session.id}'`)
+  execPrisma(`DELETE FROM result_snapshot WHERE "sessionId" = '${testData.session.id}'`)
+  execPrisma(`DELETE FROM application_document WHERE "applicationId" IN (SELECT id FROM application WHERE "sessionId" = '${testData.session.id}')`)
+  execPrisma(`DELETE FROM application WHERE "sessionId" = '${testData.session.id}'`)
   execPrisma(`DELETE FROM company WHERE id = '${testData.company.id}'`)
-  execPrisma(`DELETE FROM session_committee_assignment WHERE session_id = '${testData.session.id}'`)
-  execPrisma(`DELETE FROM session_form_definition WHERE session_id = '${testData.session.id}'`)
+  execPrisma(`DELETE FROM session_committee_assignment WHERE "sessionId" = '${testData.session.id}'`)
+  execPrisma(`DELETE FROM session_form_definition WHERE "sessionId" = '${testData.session.id}'`)
+  execPrisma(`DELETE FROM aggregation_run WHERE "sessionId" = '${testData.session.id}'`)
+  execPrisma(`DELETE FROM audit_event WHERE "sessionId" = '${testData.session.id}'`)
   execPrisma(`DELETE FROM evaluation_session WHERE id = '${testData.session.id}'`)
   execPrisma(`DELETE FROM committee_member WHERE id = '${testData.member.id}'`)
 
   console.log('\n3. 평가위원 생성...')
   execPrisma(`
-    INSERT INTO committee_member (id, name, phone, organization, position, field, is_active, created_at)
+    INSERT INTO committee_member (id, name, phone, organization, position, field, "isActive", "createdAt")
     VALUES ('${testData.member.id}', '${testData.member.name}', '${testData.member.phone}', '${testData.member.organization}', '${testData.member.position}', '${testData.member.field}', true, NOW())
     RETURNING id
   `)
@@ -176,22 +183,22 @@ async function setupTestData() {
 
   console.log('\n4. 기업 생성...')
   execPrisma(`
-    INSERT INTO company (id, name, ceo_name, business_number, address, industry, created_at)
+    INSERT INTO company (id, name, "ceoName", "businessNumber", address, industry, "createdAt")
     VALUES ('${testData.company.id}', '${testData.company.name}', '${testData.company.ceoName}', '${testData.company.businessNumber}', '${testData.company.address}', '${testData.company.industry}', NOW())
   `)
   console.log(`   ✅ 기업 생성: ${testData.company.name}`)
 
   console.log('\n5. 평가 회차 생성...')
   execPrisma(`
-    INSERT INTO evaluation_session (id, title, description, status, committee_size, trim_rule, created_at)
+    INSERT INTO evaluation_session (id, title, description, status, "committeeSize", "trimRule", "createdAt")
     VALUES ('${testData.session.id}', '${testData.session.title}', '${testData.session.description}', 'open', ${testData.session.committeeSize}, 'exclude_min_max', NOW())
   `)
   console.log(`   ✅ 평가 회차 생성: ${testData.session.title}`)
 
   console.log('\n6. 평가위원 배정...')
   execPrisma(`
-    INSERT INTO session_committee_assignment (session_id, committee_member_id, role, assigned_at)
-    VALUES ('${testData.session.id}', '${testData.member.id}', 'member', NOW())
+    INSERT INTO session_committee_assignment (id, "sessionId", "committeeMemberId", role, "assignedAt")
+    VALUES ('assignment-${testData.session.id}', '${testData.session.id}', '${testData.member.id}', 'member', NOW())
   `)
   console.log(`   ✅ 평가위원 배정`)
 
@@ -218,14 +225,14 @@ async function setupTestData() {
   }
   const schemaJson = JSON.stringify(formSchema).replace(/'/g, "''")
   execPrisma(`
-    INSERT INTO session_form_definition (id, session_id, schema_json, total_score, items_count, snapshot_at, created_at)
+    INSERT INTO session_form_definition (id, "sessionId", "schemaJson", "totalScore", "itemsCount", "snapshotAt", "createdAt")
     VALUES ('form-def-${testData.session.id}', '${testData.session.id}', '${schemaJson}', 100, 4, NOW(), NOW())
   `)
   console.log(`   ✅ 평가표 설정: 4개 항목`)
 
   console.log('\n8. 신청 생성...')
   execPrisma(`
-    INSERT INTO application (id, session_id, company_id, status, evaluation_order, created_at)
+    INSERT INTO application (id, "sessionId", "companyId", status, "evaluationOrder", "createdAt")
     VALUES ('app-${testData.session.id}', '${testData.session.id}', '${testData.company.id}', 'registered', 1, NOW())
   `)
   console.log(`   ✅ 신청 생성`)
@@ -241,7 +248,7 @@ async function setupTestData() {
     )
 
     execPrisma(`
-      INSERT INTO application_document (id, application_id, doc_type, storage_key, original_filename, mime_type, file_size, uploaded_at)
+      INSERT INTO application_document (id, "applicationId", "docType", "storageKey", "originalFilename", "mimeType", "fileSize", "uploadedAt")
       VALUES ('doc-${testData.session.id}', 'app-${testData.session.id}', 'business_plan', '${storageKey}', 'test-document.pdf', 'application/pdf', ${pdfBuffer.length}, NOW())
     `)
     console.log(`   ✅ PDF 업로드: ${storageKey}`)
