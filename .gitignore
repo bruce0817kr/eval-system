@@ -42,3 +42,8 @@ next-env.d.ts
 
 /src/generated/prisma
 .gstack/
+apps/biz-api/.venv/
+apps/biz-api/.pytest_cache/
+apps/biz-api/__pycache__/
+apps/biz-api/**/*.pyc
+apps/biz-api/*.db
