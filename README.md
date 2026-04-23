@@ -34,6 +34,14 @@ npm run platform:test
 
 FastAPI business endpoints will use the platform route boundary under `/api/biz/*`.
 
+### Phase 0-2 status
+
+- `apps/biz-api` is the imported FastAPI backend module from the business support hub.
+- `npm run platform:dev` starts the local unified platform services.
+- `npm run platform:test` runs the unified platform regression checks.
+- `/api/biz/*` routes through the platform proxy to FastAPI `/api/v1/*`.
+- The Vite frontend has not been migrated into the unified shell yet.
+
 ## Unified platform deployment boundary
 
 Run the container boundary for Next.js, FastAPI, Nginx, Postgres, Redis, and MinIO:

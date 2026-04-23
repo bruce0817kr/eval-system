@@ -481,3 +481,13 @@ S3_REGION=us-east-1
 - Added `infra/proxy/platform.nginx.conf` so `/` reaches Next.js, `/api/biz/health` reaches FastAPI `/health`, and `/api/biz/*` reaches FastAPI `/api/v1/*`.
 - Added `apps/biz-api/Dockerfile` for the FastAPI service image used by the platform compose file.
 - Smoke endpoints: `http://localhost:3003/api/health` and `http://localhost:3003/api/biz/health`.
+
+### 2026-04-23 Platform phase 0-2 final handoff
+- The biz-support-hub backend has been imported as the FastAPI backend module under `apps/biz-api`.
+- Root platform commands are `npm run platform:dev` for local unified service startup and `npm run platform:test` for unified regression verification.
+- Unified route boundary: `/api/*` remains the Next.js API surface, while `/api/biz/*` is proxied to the FastAPI backend under `/api/v1/*`.
+- The Vite frontend is not yet migrated and is not user-facing in the unified shell.
+- Full phase verification summary:
+  - Handoff reference check: `rg -n "platform:dev|platform:test|apps/biz-api|api/biz" README.md HANDOVER.md`.
+  - Platform regression: `npm run platform:test`.
+  - Deployment boundary config: `docker compose -f infra\docker-compose.platform.yml config`.
