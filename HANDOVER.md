@@ -471,3 +471,7 @@ S3_REGION=us-east-1
 - 다음 작업
   - 사업관리 시스템 staging base URL/token/webhook URL/HMAC secret/실제 payload 샘플을 받으면 staging 대상으로 `integration:smoke`와 webhook sample을 실행
   - 실제 `program`, `participant`, `support_case`, `attachment` payload 기준 field mapping 확인
+
+### 2026-04-23 Platform unification baseline
+- Platform unification started from clean `eval-system` and `biz-support-hub` repos.
+- Do not proceed if either repo has uncommitted source changes.
