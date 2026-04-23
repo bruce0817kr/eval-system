@@ -34,6 +34,27 @@ npm run platform:test
 
 FastAPI business endpoints will use the platform route boundary under `/api/biz/*`.
 
+## Unified platform deployment boundary
+
+Run the container boundary for Next.js, FastAPI, Nginx, Postgres, Redis, and MinIO:
+
+```powershell
+docker compose -f infra\docker-compose.platform.yml up -d proxy web biz-api
+```
+
+Smoke the unified boundary:
+
+```powershell
+Invoke-WebRequest http://localhost:3003/api/health -UseBasicParsing
+Invoke-WebRequest http://localhost:3003/api/biz/health -UseBasicParsing
+```
+
+Stop the boundary:
+
+```powershell
+docker compose -f infra\docker-compose.platform.yml down
+```
+
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
 ## Learn More

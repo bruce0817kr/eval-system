@@ -475,3 +475,9 @@ S3_REGION=us-east-1
 ### 2026-04-23 Platform unification baseline
 - Platform unification started from clean `eval-system` and `biz-support-hub` repos.
 - Do not proceed if either repo has uncommitted source changes.
+
+### 2026-04-23 Task 4 platform deployment boundary
+- Added `infra/docker-compose.platform.yml` as the unified container boundary for Next.js web, FastAPI biz API, Nginx proxy, Postgres, Redis, and MinIO.
+- Added `infra/proxy/platform.nginx.conf` so `/` reaches Next.js, `/api/biz/health` reaches FastAPI `/health`, and `/api/biz/*` reaches FastAPI `/api/v1/*`.
+- Added `apps/biz-api/Dockerfile` for the FastAPI service image used by the platform compose file.
+- Smoke endpoints: `http://localhost:3003/api/health` and `http://localhost:3003/api/biz/health`.
